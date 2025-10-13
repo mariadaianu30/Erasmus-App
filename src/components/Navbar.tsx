@@ -50,7 +50,7 @@ export default function Navbar() {
         if (session?.user) {
           setUser(session.user)
           // Add a small delay for sign-up events to allow profile creation
-          if (event === 'SIGNED_UP') {
+          if ((event as any) === 'SIGNED_UP') {
             setTimeout(() => fetchProfile(session.user.id), 1000)
           } else {
             await fetchProfile(session.user.id)
