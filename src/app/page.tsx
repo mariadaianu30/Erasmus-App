@@ -28,7 +28,12 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetchStats()
+    // Add a small delay to improve initial page load performance
+    const timer = setTimeout(() => {
+      fetchStats()
+    }, 100)
+    
+    return () => clearTimeout(timer)
   }, [])
 
   const fetchStats = async () => {
@@ -110,10 +115,10 @@ export default function Home() {
                 by Scout Society
               </span>
             </div>
-            <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
+            <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold text-gray-900 mb-6">
               Erasmus+ Connect
             </h1>
-            <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
+            <p className="text-lg sm:text-xl text-gray-600 mb-8 max-w-3xl mx-auto px-4">
               Connect with verified opportunities, discover amazing events, and manage your applications with ease. 
               Join young people and organizations building meaningful connections across Europe.
             </p>
@@ -144,7 +149,7 @@ export default function Home() {
             <p className="text-lg text-gray-600">Connecting communities across Europe</p>
           </div>
           
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
             <div className="text-center">
               <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Calendar className="h-8 w-8 text-blue-600" />

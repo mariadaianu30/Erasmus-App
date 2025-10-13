@@ -13,6 +13,8 @@ export const metadata: Metadata = {
   title: "Erasmus+ Connect",
   description: "Erasmus+ Connect by Scout Society - Connect with verified opportunities, discover events, and manage applications with ease.",
   keywords: ["erasmus+", "scout society", "events", "community", "networking", "participants", "organizations", "verified opportunities"],
+  viewport: "width=device-width, initial-scale=1, maximum-scale=5",
+  themeColor: "#3b82f6",
 };
 
 export default function RootLayout({

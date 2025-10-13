@@ -41,9 +41,31 @@ body {
   outline-offset: 2px;
 }
 
-/* Smooth transitions */
+/* Smooth transitions - optimized for mobile */
 * {
   transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  * {
+    transition: none; /* Disable transitions on mobile for better performance */
+  }
+  
+  /* Optimize touch targets */
+  button, a, input, select, textarea {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Reduce motion for better performance */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 }
 
 /* Loading animation */
