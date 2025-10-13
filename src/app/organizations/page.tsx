@@ -165,7 +165,7 @@ export default function OrganizationsPage() {
                       <div className="flex items-center text-sm text-gray-500">
                         <Globe className="h-4 w-4 mr-2" />
                         <a 
-                          href={org.organization_website || org.website} 
+                          href={(org.organization_website || org.website) || '#'} 
                           target="_blank" 
                           rel="noopener noreferrer"
                           className="text-blue-600 hover:text-blue-800 truncate"
