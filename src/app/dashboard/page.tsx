@@ -1,0 +1,911 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { supabase } from '@/lib/supabase'
+import { calculateAge } from '@/lib/utils'
+import { Calendar, Users, User, LogOut, Plus, Eye, Settings, TrendingUp, Clock, CheckCircle, XCircle, AlertCircle, Edit, Award } from 'lucide-react'
+
+interface User {
+  id: string
+  email?: string
+}
+
+interface Profile {
+  user_type: 'participant' | 'organization'
+  first_name?: string
+  last_name?: string
+  organization_name?: string
+  bio?: string
+  location?: string
+  birth_date?: string
+  website?: string
+}
+
+interface Application {
+  id: string
+  status: 'pending' | 'accepted' | 'rejected'
+  created_at: string
+  events: {
+    id: string
+    title: string
+    start_date: string
+    end_date: string
+    location: string
+    category: string
+    organization_name: string | null
+  }
+}
+
+interface ApplicationStats {
+  total: number
+  pending: number
+  accepted: number
+  rejected: number
+}
+
+export default function DashboardPage() {
+  const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [applications, setApplications] = useState<Application[]>([])
+  const [applicationStats, setApplicationStats] = useState<ApplicationStats>({ total: 0, pending: 0, accepted: 0, rejected: 0 })
+  const [loading, setLoading] = useState(true)
+  const [isEditingProfile, setIsEditingProfile] = useState(false)
+  const [profileForm, setProfileForm] = useState({
+    first_name: '',
+    last_name: '',
+    bio: '',
+    location: '',
+    birth_date: '',
+    website: ''
+  })
+  const [profileUpdateLoading, setProfileUpdateLoading] = useState(false)
+  const [profileUpdateMessage, setProfileUpdateMessage] = useState('')
+  const router = useRouter()
+
+  useEffect(() => {
+    const getSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          console.error('Session error:', error)
+          router.push('/auth')
+          return
+        }
+        
+        if (!session?.user) {
+          router.push('/auth')
+          return
+        }
+
+        setUser(session.user)
+        
+        // Fetch user profile
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('user_type, first_name, last_name, organization_name, bio, location, birth_date, website')
+          .eq('id', session.user.id)
+          .single()
+
+        if (profileError) {
+          console.error('Profile error:', profileError)
+          
+          // If profile doesn't exist, try to create it
+          if (profileError.code === 'PGRST116' || profileError.message?.includes('No rows found')) {
+            try {
+              // Get user metadata to extract names
+              const { data: userData } = await supabase.auth.getUser()
+              const userMeta = userData?.user?.user_metadata || {}
+              
+              const { error: insertError } = await supabase
+                .from('profiles')
+                .upsert({
+                  id: session.user.id,
+                  user_type: (userMeta.user_type || 'participant') as any,
+                  first_name: userMeta.first_name || '',
+                  last_name: userMeta.last_name || '',
+                  birth_date: userMeta.birth_date || new Date(Date.now() - 18 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                  organization_name: userMeta.organization_name || null
+                })
+              
+              if (!insertError) {
+                // Fetch the newly created/updated profile
+        const { data: newProfileData } = await supabase
+          .from('profiles')
+          .select('user_type, first_name, last_name, organization_name, bio, location, birth_date, website')
+          .eq('id', session.user.id)
+          .single()
+                
+                if (newProfileData) {
+                  setProfile(newProfileData)
+                }
+              }
+            } catch (createError) {
+              console.error('Failed to create profile:', createError)
+            }
+          }
+        } else if (profileData) {
+          setProfile(profileData)
+          
+          // Redirect organizations to their dashboard
+          if (profileData.user_type === 'organization') {
+            router.push('/dashboard/organization')
+            return
+          }
+          
+          // Populate profile form
+          setProfileForm({
+            first_name: profileData.first_name || '',
+            last_name: profileData.last_name || '',
+            bio: profileData.bio || '',
+            location: profileData.location || '',
+            birth_date: profileData.birth_date || '',
+            website: profileData.website || ''
+          })
+          
+          // Fetch applications for participants
+          if (profileData.user_type === 'participant') {
+            await fetchApplications(session.user.id)
+          }
+        }
+      } catch (error) {
+        console.error('Dashboard error:', error)
+        router.push('/auth')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    getSession()
+  }, [router])
+
+  const fetchApplications = async (userId: string) => {
+    try {
+        const { data, error } = await supabase
+          .from('applications')
+          .select(`
+            id,
+            status,
+            created_at,
+            events (
+              id,
+              title,
+              start_date,
+              end_date,
+              location,
+              category,
+              organization_name
+            )
+          `)
+          .eq('participant_id', userId)
+          .order('created_at', { ascending: false })
+
+      if (error) {
+        console.log('Applications query error:', error)
+        console.log('Error details:', JSON.stringify(error, null, 2))
+        // If table doesn't exist or no applications, set empty arrays
+        setApplications([])
+        setApplicationStats({
+          total: 0,
+          pending: 0,
+          accepted: 0,
+          rejected: 0
+        })
+        return
+      }
+
+      console.log('Applications fetched successfully:', data)
+      console.log('Number of applications:', data?.length || 0)
+      setApplications((data as unknown as Application[]) || [])
+      
+      // Calculate stats
+      const stats = {
+        total: data?.length || 0,
+        pending: data?.filter(app => app.status === 'pending').length || 0,
+        accepted: data?.filter(app => app.status === 'accepted').length || 0,
+        rejected: data?.filter(app => app.status === 'rejected').length || 0
+      }
+      setApplicationStats(stats)
+    } catch (error) {
+      console.log('Applications fetch error (non-critical):', error)
+      // Set empty data on error
+      setApplications([])
+      setApplicationStats({
+        total: 0,
+        pending: 0,
+        accepted: 0,
+        rejected: 0
+      })
+    }
+  }
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push('/')
+  }
+
+  const handleProfileUpdate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user) return
+
+    setProfileUpdateLoading(true)
+    setProfileUpdateMessage('')
+
+    // Add timeout to prevent hanging
+    const timeoutId = setTimeout(() => {
+      setProfileUpdateLoading(false)
+      setProfileUpdateMessage('Update timed out. Please try again.')
+    }, 5000) // 5 second timeout
+
+    try {
+      // Handle website field - simple cleanup
+      const websiteValue = profileForm.website?.trim() || null;
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          first_name: profileForm.first_name,
+          last_name: profileForm.last_name,
+          bio: profileForm.bio,
+          location: profileForm.location,
+          birth_date: profileForm.birth_date || null,
+          website: websiteValue
+        })
+        .eq('id', user.id)
+
+
+      if (error) {
+        setProfileUpdateMessage('Failed to update profile: ' + error.message)
+      } else {
+        setProfileUpdateMessage('Profile updated successfully!')
+        setIsEditingProfile(false)
+        
+        // Refresh profile data
+        const { data: updatedProfile } = await supabase
+          .from('profiles')
+          .select('user_type, first_name, last_name, organization_name, bio, location, birth_date, website')
+          .eq('id', user.id)
+          .single()
+        
+        if (updatedProfile) {
+          setProfile(updatedProfile)
+        }
+      }
+    } catch (error) {
+      setProfileUpdateMessage('An error occurred while updating profile')
+    } finally {
+      clearTimeout(timeoutId)
+      setProfileUpdateLoading(false)
+    }
+  }
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target
+    setProfileForm(prev => ({
+      ...prev,
+      [name]: value
+    }))
+  }
+
+  const handleEditProfileClick = () => {
+    // Populate form with current profile data when starting to edit
+    if (profile) {
+      setProfileForm({
+        first_name: profile.first_name || '',
+        last_name: profile.last_name || '',
+        bio: profile.bio || '',
+        location: profile.location || '',
+        birth_date: profile.birth_date || '',
+        website: profile.website || ''
+      })
+    }
+    setIsEditingProfile(true)
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    )
+  }
+
+  if (!user || !profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h2>
+          <p className="text-gray-600 mb-4">You need to be logged in to access this page.</p>
+          <button
+            onClick={() => router.push('/auth')}
+            className="bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700"
+          >
+            Go to Login
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const getDisplayName = () => {
+    if (profile.user_type === 'organization') {
+      return profile.organization_name || 'Organization'
+    }
+    
+    // For participants, try to get a meaningful display name
+    const firstName = profile.first_name?.trim() || ''
+    const lastName = profile.last_name?.trim() || ''
+    
+    // Check if names are empty or default values
+    const isEmptyName = (!firstName || firstName.trim() === '' || firstName === 'User') && 
+                       (!lastName || lastName.trim() === '' || lastName === 'User')
+    
+    if (isEmptyName) {
+      // If names are empty, extract from email
+      if (user.email) {
+        const emailName = user.email.split('@')[0]
+        // Capitalize first letter and replace dots/underscores with spaces
+        return emailName.replace(/[._]/g, ' ').split(' ').map(word => 
+          word.charAt(0).toUpperCase() + word.slice(1)
+        ).join(' ')
+      }
+      return 'User'
+    }
+    
+    // If we have both names, show full name
+    if (firstName && lastName) {
+      return `${firstName} ${lastName}`
+    }
+    
+    // If we have only first name, show it
+    if (firstName) {
+      return firstName
+    }
+    
+    // If we have only last name, show it
+    if (lastName) {
+      return lastName
+    }
+    
+    // Extract name from email if possible (before @)
+    if (user.email) {
+      const emailName = user.email.split('@')[0]
+      // Capitalize first letter and replace dots/underscores with spaces
+      return emailName.replace(/[._]/g, ' ').split(' ').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1)
+      ).join(' ')
+    }
+    
+    // Final fallback
+    return 'User'
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
+                Welcome back, {getDisplayName()}!
+              </h1>
+              <p className="text-gray-600 mt-2">
+                {profile.user_type === 'participant' 
+                  ? 'Discover and apply to amazing events'
+                  : 'Manage your events and applications'
+                }
+              </p>
+            </div>
+            <button
+              onClick={handleSignOut}
+              className="flex items-center text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md hover:bg-gray-100"
+            >
+              <LogOut className="h-5 w-5 mr-2" />
+              Sign Out
+            </button>
+          </div>
+        </div>
+
+        {/* Profile Editing Section */}
+        <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-900">Profile Information</h2>
+            <button
+              onClick={isEditingProfile ? () => setIsEditingProfile(false) : handleEditProfileClick}
+              className="flex items-center text-blue-600 hover:text-blue-700 px-3 py-2 rounded-md hover:bg-blue-50"
+            >
+              <Edit className="h-4 w-4 mr-2" />
+              {isEditingProfile ? 'Cancel' : 'Edit Profile'}
+            </button>
+          </div>
+
+          {isEditingProfile ? (
+            <form onSubmit={handleProfileUpdate} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    First Name
+                  </label>
+                  <input
+                    type="text"
+                    name="first_name"
+                    value={profileForm.first_name}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Last Name
+                  </label>
+                  <input
+                    type="text"
+                    name="last_name"
+                    value={profileForm.last_name}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Birth Date
+                  </label>
+                  <input
+                    type="date"
+                    name="birth_date"
+                    value={profileForm.birth_date}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    max={new Date().toISOString().split('T')[0]}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Location
+                  </label>
+                  <input
+                    type="text"
+                    name="location"
+                    value={profileForm.location}
+                    onChange={handleInputChange}
+                    placeholder="City, Country"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Bio
+                </label>
+                <textarea
+                  name="bio"
+                  value={profileForm.bio}
+                  onChange={handleInputChange}
+                  rows={3}
+                  placeholder="Tell us about yourself..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Website
+                </label>
+                  <input
+                    type="text"
+                    name="website"
+                    value={profileForm.website}
+                    onChange={handleInputChange}
+                    placeholder="your-website.com or https://your-website.com"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+              </div>
+
+              {profileUpdateMessage && (
+                <div className={`p-3 rounded-md ${
+                  profileUpdateMessage.includes('successfully') 
+                    ? 'bg-green-50 text-green-700 border border-green-200' 
+                    : 'bg-red-50 text-red-700 border border-red-200'
+                }`}>
+                  {profileUpdateMessage}
+                </div>
+              )}
+
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setIsEditingProfile(false)}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={profileUpdateLoading}
+                  className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-md transition-colors disabled:opacity-50"
+                >
+                  {profileUpdateLoading ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-1">Name</h3>
+                <p className="text-gray-900">{profile?.first_name} {profile?.last_name}</p>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-1">Age</h3>
+                <p className="text-gray-900">
+                  {profile?.birth_date ? calculateAge(profile.birth_date) + ' years old' : 'Not specified'}
+                </p>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-1">Location</h3>
+                <p className="text-gray-900">{profile?.location || 'Not specified'}</p>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-1">Website</h3>
+                <p className="text-gray-900">
+                  {profile?.website ? (
+                    <a href={profile.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                      {profile.website}
+                    </a>
+                  ) : 'Not specified'}
+                </p>
+              </div>
+              <div className="md:col-span-2">
+                <h3 className="text-sm font-medium text-gray-500 mb-1">Bio</h3>
+                <p className="text-gray-900">{profile?.bio || 'No bio provided'}</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Dashboard Content */}
+        {profile.user_type === 'participant' ? (
+          <div className="space-y-8">
+            {/* Stats Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="bg-white rounded-lg shadow-sm border p-6">
+                <div className="flex items-center">
+                  <div className="bg-blue-100 p-3 rounded-full">
+                    <TrendingUp className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">Total Applications</p>
+                    <p className="text-2xl font-bold text-gray-900">{applicationStats.total}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-white rounded-lg shadow-sm border p-6">
+                <div className="flex items-center">
+                  <div className="bg-yellow-100 p-3 rounded-full">
+                    <Clock className="h-6 w-6 text-yellow-600" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">Pending</p>
+                    <p className="text-2xl font-bold text-gray-900">{applicationStats.pending}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-white rounded-lg shadow-sm border p-6">
+                <div className="flex items-center">
+                  <div className="bg-green-100 p-3 rounded-full">
+                    <CheckCircle className="h-6 w-6 text-green-600" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">Accepted</p>
+                    <p className="text-2xl font-bold text-gray-900">{applicationStats.accepted}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-white rounded-lg shadow-sm border p-6">
+                <div className="flex items-center">
+                  <div className="bg-red-100 p-3 rounded-full">
+                    <XCircle className="h-6 w-6 text-red-600" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">Rejected</p>
+                    <p className="text-2xl font-bold text-gray-900">{applicationStats.rejected}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Quick Actions */}
+              <div className="bg-white rounded-lg shadow-sm border p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+                <div className="space-y-3">
+                  <Link
+                    href="/events"
+                    className="w-full flex items-center justify-center px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 transition-colors"
+                  >
+                    <Calendar className="h-5 w-5 mr-2" />
+                    Browse Opportunities
+                  </Link>
+                  <Link
+                    href="/my-applications"
+                    className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    <Eye className="h-5 w-5 mr-2" />
+                    My Applications
+                  </Link>
+                  <Link
+                    href="/profile"
+                    className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                  >
+                    <Edit className="h-5 w-5 mr-2" />
+                    Edit Profile
+                  </Link>
+                </div>
+              </div>
+
+              {/* Recent Applications */}
+              <div className="bg-white rounded-lg shadow-sm border p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Applications</h3>
+                <div className="space-y-4">
+                  {applications.length === 0 ? (
+                    <div className="text-center py-4">
+                      <AlertCircle className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-500 text-sm">No applications yet</p>
+                      <p className="text-gray-400 text-xs mt-1">Start by browsing opportunities!</p>
+                    </div>
+                  ) : (
+                    applications.slice(0, 3).map((application) => (
+                      <div key={application.id} className="border border-gray-200 rounded-lg p-3 hover:shadow-sm transition-shadow">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <h4 className="text-sm font-medium text-gray-900 mb-1">
+                              {application.events.title}
+                            </h4>
+                            <p className="text-xs text-gray-600 mb-1">
+                              by {application.events.organization_name || 'Erasmus+ Connect'}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Applied {new Date(application.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            {application.status === 'accepted' && <CheckCircle className="h-4 w-4 text-green-600" />}
+                            {application.status === 'rejected' && <XCircle className="h-4 w-4 text-red-600" />}
+                            {application.status === 'pending' && <Clock className="h-4 w-4 text-yellow-600" />}
+                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                              application.status === 'accepted' ? 'bg-green-100 text-green-800' :
+                              application.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                              'bg-yellow-100 text-yellow-800'
+                            }`}>
+                              {application.status === 'pending' ? 'Under Review' : 
+                               application.status === 'accepted' ? 'Accepted!' : 
+                               'Not Selected'}
+                            </span>
+                          </div>
+                        </div>
+                        {application.status === 'accepted' && (
+                          <div className="bg-green-50 border border-green-200 rounded p-2 mt-2">
+                            <p className="text-xs text-green-800 font-medium">
+                              🎉 Congratulations! You've been accepted to this event.
+                            </p>
+                          </div>
+                        )}
+                        {application.status === 'rejected' && (
+                          <div className="bg-gray-50 border border-gray-200 rounded p-2 mt-2">
+                            <p className="text-xs text-gray-700">
+                              Thank you for your interest. Keep applying to other opportunities!
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+                {applications.length > 3 && (
+                  <Link
+                    href="/my-applications"
+                    className="mt-4 block text-center text-sm text-blue-600 hover:text-blue-800"
+                  >
+                    View all applications →
+                  </Link>
+                )}
+              </div>
+
+              {/* Profile Summary */}
+              <div className="bg-white rounded-lg shadow-sm border p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Profile</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center">
+                    <User className="h-5 w-5 text-gray-400 mr-3" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{getDisplayName()}</p>
+                      <p className="text-xs text-gray-500">Participant</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <Calendar className="h-5 w-5 text-gray-400 mr-3" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {profile?.birth_date ? calculateAge(profile.birth_date) + ' years old' : 'Age not set'}
+                      </p>
+                      <p className="text-xs text-gray-500">Age</p>
+                    </div>
+                  </div>
+                  
+                  {profile.location && (
+                    <div className="flex items-center">
+                      <Award className="h-5 w-5 text-gray-400 mr-3" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{profile.location}</p>
+                        <p className="text-xs text-gray-500">Location</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {profile.bio && (
+                    <div className="pt-3 border-t">
+                      <p className="text-xs text-gray-500 mb-1">Bio</p>
+                      <p className="text-sm text-gray-700 line-clamp-3">{profile.bio}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {/* Organization Stats Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="bg-white rounded-lg shadow-sm border p-6">
+                <div className="flex items-center">
+                  <div className="bg-blue-100 p-3 rounded-full">
+                    <Calendar className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">Total Opportunities</p>
+                    <p className="text-2xl font-bold text-gray-900">0</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-white rounded-lg shadow-sm border p-6">
+                <div className="flex items-center">
+                  <div className="bg-green-100 p-3 rounded-full">
+                    <TrendingUp className="h-6 w-6 text-green-600" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">Active Opportunities</p>
+                    <p className="text-2xl font-bold text-gray-900">0</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-white rounded-lg shadow-sm border p-6">
+                <div className="flex items-center">
+                  <div className="bg-purple-100 p-3 rounded-full">
+                    <Users className="h-6 w-6 text-purple-600" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">Total Applications</p>
+                    <p className="text-2xl font-bold text-gray-900">0</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-white rounded-lg shadow-sm border p-6">
+                <div className="flex items-center">
+                  <div className="bg-orange-100 p-3 rounded-full">
+                    <CheckCircle className="h-6 w-6 text-orange-600" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">Accepted Participants</p>
+                    <p className="text-2xl font-bold text-gray-900">0</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Quick Actions */}
+              <div className="bg-white rounded-lg shadow-sm border p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+                <div className="space-y-3">
+                  <Link
+                    href="/events/create"
+                    className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    <Plus className="h-5 w-5 mr-2" />
+                    Create Opportunity
+                  </Link>
+                  <Link
+                    href="/events/manage"
+                    className="w-full flex items-center justify-center px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 transition-colors"
+                  >
+                    <Calendar className="h-5 w-5 mr-2" />
+                    Manage Opportunities
+                  </Link>
+                  <Link
+                    href="/applications"
+                    className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                  >
+                    <Users className="h-5 w-5 mr-2" />
+                    View Applications
+                  </Link>
+                </div>
+              </div>
+
+              {/* Recent Activity */}
+              <div className="bg-white rounded-lg shadow-sm border p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
+                <div className="text-center py-8">
+                  <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500 text-sm">No recent activity</p>
+                    <p className="text-gray-400 text-xs mt-2">Create your first opportunity to get started!</p>
+                </div>
+              </div>
+
+              {/* Organization Profile */}
+              <div className="bg-white rounded-lg shadow-sm border p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Organization Profile</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center">
+                    <Award className="h-5 w-5 text-gray-400 mr-3" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{getDisplayName()}</p>
+                      <p className="text-xs text-gray-500">Verified Organization</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <User className="h-5 w-5 text-gray-400 mr-3" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{user.email}</p>
+                      <p className="text-xs text-gray-500">Contact Email</p>
+                    </div>
+                  </div>
+                  
+                  {profile.location && (
+                    <div className="flex items-center">
+                      <Award className="h-5 w-5 text-gray-400 mr-3" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{profile.location}</p>
+                        <p className="text-xs text-gray-500">Location</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {profile.bio && (
+                    <div className="pt-3 border-t">
+                      <p className="text-xs text-gray-500 mb-1">About</p>
+                      <p className="text-sm text-gray-700 line-clamp-3">{profile.bio}</p>
+                    </div>
+                  )}
+                  
+                  <Link
+                    href="/profile"
+                    className="mt-4 w-full flex items-center justify-center px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                  >
+                    <Settings className="h-5 w-5 mr-2" />
+                    Edit Profile
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
