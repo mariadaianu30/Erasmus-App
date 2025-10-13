@@ -190,7 +190,7 @@ export default function OrganizationDetailsPage() {
                   <div>
                     <h1 className="text-3xl font-bold text-gray-900 mb-2">{organization.organization_name}</h1>
                     <div className="flex items-center mb-2">
-                      {organization.is_verified ? (
+                      {(organization as any).is_verified ? (
                         <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
                           <Award className="h-4 w-4 mr-2" />
                           Verified Organization
@@ -321,7 +321,7 @@ export default function OrganizationDetailsPage() {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-gray-600">Status</span>
-                    {organization.is_verified ? (
+                    {(organization as any).is_verified ? (
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                         <Award className="h-3 w-3 mr-1" />
                         Verified
