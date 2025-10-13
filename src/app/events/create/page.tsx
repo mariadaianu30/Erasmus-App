@@ -202,7 +202,7 @@ export default function CreateEventPage() {
         category: formData.category,
         organization_id: user.id,
         organization_name: profile.organization_name || 'Unknown Organization',
-        organization_website: profile.website || null,
+        organization_website: (profile as any).website || null,
         is_published: true
       }
 
