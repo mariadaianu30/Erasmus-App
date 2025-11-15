@@ -14,7 +14,7 @@ export default function Footer() {
             </div>
             <p className="text-gray-300 mb-6 max-w-md">
               Connect with events and communities. Discover, apply, and manage events all in one place. 
-              Whether you&apos;re a participant looking for opportunities or an organization hosting events, 
+              Whether you&apos;re a participant looking for events or an organization hosting experiences, 
               we&apos;ve got you covered.
             </p>
             <div className="flex space-x-4">

@@ -224,7 +224,7 @@ export default function MyApplicationsPage() {
               </h3>
               <p className="text-gray-500 mb-6">
                 {filter === 'all' 
-                  ? "You haven't applied to any opportunities yet. Start exploring!"
+                  ? "You haven't applied to any events yet. Start exploring!"
                   : `You don't have any ${filter} applications at the moment.`
                 }
               </p>
@@ -233,7 +233,7 @@ export default function MyApplicationsPage() {
                   href="/events"
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
                 >
-                  Browse Opportunities
+                  Browse Events
                 </Link>
               )}
             </div>

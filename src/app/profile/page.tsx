@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { calculateAge } from '@/lib/utils'
-import { User, Save, ArrowLeft, Mail, MapPin, Calendar, Building, FileText } from 'lucide-react'
+import { User, Save, ArrowLeft, Mail, MapPin, Calendar, Building, FileText, Languages, Flag, Briefcase, AlertCircle, CheckCircle } from 'lucide-react'
+import { countries } from '@/lib/countries'
 import Link from 'next/link'
 
 interface User {
@@ -21,6 +22,17 @@ interface Profile {
   location?: string
   birth_date?: string
   website?: string
+  // Participant-specific fields
+  email?: string
+  gender?: 'female' | 'male' | 'undefined'
+  nationality?: string
+  citizenships?: string[]
+  residency_country?: string
+          role_in_project?: 'participant' | 'group leader' | 'trainer or facilitator'
+  has_fewer_opportunities?: boolean
+  fewer_opportunities_categories?: any
+  languages?: any
+  participant_target_groups?: any
 }
 
 export default function ProfilePage() {
@@ -40,8 +52,50 @@ export default function ProfilePage() {
     bio: '',
     location: '',
     birth_date: '',
-    website: ''
+    website: '',
+    // Participant-specific fields
+    email: '',
+    gender: '' as 'female' | 'male' | 'undefined' | '',
+    nationality: '',
+    citizenships: [] as string[],
+    residency_country: '',
+    role_in_project: '' as 'participant' | 'group leader' | 'trainer or facilitator' | '',
+    has_fewer_opportunities: false,
+    fewer_opportunities_categories: [] as string[],
+    languages: [] as Array<{language: string, level: string}>,
+    participant_target_groups: [] as string[]
   })
+
+  const [newLanguage, setNewLanguage] = useState({ language: '', level: '' })
+  const [newCitizenship, setNewCitizenship] = useState('')
+
+  const genderOptions = ['female', 'male', 'undefined']
+  const roleOptions = ['participant', 'group leader', 'trainer or facilitator']
+  const fewerOpportunitiesOptions = [
+    'Discrimination',
+    'Education',
+    'Cultural',
+    'Disabilities',
+    'Economical',
+    'Geographical',
+    'Health',
+    'Social'
+  ]
+  const targetGroupOptions = [
+    'Youth',
+    'Youth workers',
+    'Trainers',
+    'Youth leaders',
+    'Project managers',
+    'Policy makers',
+    'Volunteering',
+    'Mentors',
+    'Coaches',
+    'Researchers',
+    'Authorities',
+    'Others'
+  ]
+  const languageLevels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'Native']
 
   useEffect(() => {
     const getSession = async () => {
@@ -79,7 +133,7 @@ export default function ProfilePage() {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('user_type, first_name, last_name, organization_name, bio, location, birth_date, website')
+        .select('*')
         .eq('id', userId)
         .single()
 
@@ -96,6 +150,13 @@ export default function ProfilePage() {
         }
         
         setProfile(data)
+        
+        // Parse JSONB fields
+        const languages = Array.isArray(data.languages) ? data.languages : []
+        const citizenships = Array.isArray(data.citizenships) ? data.citizenships : []
+        const fewerOpps = Array.isArray(data.fewer_opportunities_categories) ? data.fewer_opportunities_categories : []
+        const targetGroups = Array.isArray(data.participant_target_groups) ? data.participant_target_groups : []
+        
         setFormData({
           first_name: data.first_name || '',
           last_name: data.last_name || '',
@@ -103,7 +164,17 @@ export default function ProfilePage() {
           bio: data.bio || '',
           location: data.location || '',
           birth_date: data.birth_date || '',
-          website: data.website || ''
+          website: data.website || '',
+          email: data.email || '',
+          gender: data.gender || '',
+          nationality: data.nationality || '',
+          citizenships: citizenships,
+          residency_country: data.residency_country || '',
+          role_in_project: data.role_in_project || '',
+          has_fewer_opportunities: data.has_fewer_opportunities || false,
+          fewer_opportunities_categories: fewerOpps,
+          languages: languages,
+          participant_target_groups: targetGroups
         })
       }
     } catch (error) {
@@ -139,6 +210,16 @@ export default function ProfilePage() {
         updateData.birth_date = formData.birth_date || null
         updateData.bio = formData.bio.trim()
         updateData.location = formData.location.trim()
+        updateData.email = formData.email.trim() || null
+        updateData.gender = formData.gender || null
+        updateData.nationality = formData.nationality.trim() || null
+        updateData.citizenships = formData.citizenships.length > 0 ? formData.citizenships : null
+        updateData.residency_country = formData.residency_country.trim() || null
+        updateData.role_in_project = formData.role_in_project || null
+        updateData.has_fewer_opportunities = formData.has_fewer_opportunities
+        updateData.fewer_opportunities_categories = formData.fewer_opportunities_categories.length > 0 ? formData.fewer_opportunities_categories : null
+        updateData.languages = formData.languages.length > 0 ? formData.languages : null
+        updateData.participant_target_groups = formData.participant_target_groups.length > 0 ? formData.participant_target_groups : null
       } else {
         updateData.organization_name = formData.organization_name.trim()
         updateData.bio = formData.bio.trim()
@@ -165,11 +246,63 @@ export default function ProfilePage() {
     }
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target
+    const checked = (e.target as HTMLInputElement).checked
+    
+    setFormData(prev => {
+      if (type === 'checkbox') {
+        if (name === 'has_fewer_opportunities') {
+          return { ...prev, [name]: checked }
+        }
+        // Handle checkbox arrays
+        if (name.startsWith('fewer_opp_') || name.startsWith('target_group_')) {
+          const key = name.startsWith('fewer_opp_') ? 'fewer_opportunities_categories' : 'participant_target_groups'
+          const item = name.replace('fewer_opp_', '').replace('target_group_', '')
+          const current = prev[key as keyof typeof prev] as string[]
+          if (checked) {
+            return { ...prev, [key]: [...current, item] }
+          } else {
+            return { ...prev, [key]: current.filter(i => i !== item) }
+          }
+        }
+        return { ...prev, [name]: checked }
+      }
+      return { ...prev, [name]: value }
+    })
+  }
+
+  const addLanguage = () => {
+    if (newLanguage.language && newLanguage.level) {
+      setFormData(prev => ({
+        ...prev,
+        languages: [...prev.languages, { language: newLanguage.language, level: newLanguage.level }]
+      }))
+      setNewLanguage({ language: '', level: '' })
+    }
+  }
+
+  const removeLanguage = (index: number) => {
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      languages: prev.languages.filter((_, i) => i !== index)
+    }))
+  }
+
+  const addCitizenship = () => {
+    if (newCitizenship.trim()) {
+      setFormData(prev => ({
+        ...prev,
+        citizenships: [...prev.citizenships, newCitizenship.trim()]
+      }))
+      setNewCitizenship('')
+    }
+  }
+
+  const removeCitizenship = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      citizenships: prev.citizenships.filter((_, i) => i !== index)
     }))
   }
 
@@ -249,8 +382,8 @@ export default function ProfilePage() {
                 </p>
                 <p className="text-xs text-blue-700">
                   {profile.user_type === 'participant' 
-                    ? 'You can participate in opportunities and apply to events'
-                    : 'You can create and manage opportunities'
+                    ? 'You can participate in events and apply to experiences'
+                    : 'You can create and manage events'
                   }
                 </p>
               </div>
@@ -338,6 +471,232 @@ export default function ProfilePage() {
                     />
                   </div>
                 </div>
+
+                {/* Gender */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Gender
+                  </label>
+                  <select
+                    name="gender"
+                    value={formData.gender}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">Select gender</option>
+                    {genderOptions.map(option => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Nationality, Residency Country */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <Flag className="h-4 w-4 inline mr-2" />
+                      Nationality
+                    </label>
+                    <select
+                      name="nationality"
+                      value={formData.nationality}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    >
+                      <option value="">Select nationality</option>
+                      {countries.map(country => (
+                        <option key={country} value={country}>{country}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <MapPin className="h-4 w-4 inline mr-2" />
+                      Residency Country
+                    </label>
+                    <select
+                      name="residency_country"
+                      value={formData.residency_country}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    >
+                      <option value="">Select country</option>
+                      {countries.map(country => (
+                        <option key={country} value={country}>{country}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Citizenships */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Citizenships
+                  </label>
+                  <div className="flex gap-2 mb-2">
+                    <select
+                      value={newCitizenship}
+                      onChange={(e) => setNewCitizenship(e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    >
+                      <option value="">Select citizenship to add</option>
+                      {countries.filter(c => !formData.citizenships.includes(c)).map(country => (
+                        <option key={country} value={country}>{country}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={addCitizenship}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                    >
+                      Add
+                    </button>
+                  </div>
+                  {formData.citizenships.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {formData.citizenships.map((citizenship, idx) => (
+                        <span key={idx} className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm flex items-center gap-2">
+                          {citizenship}
+                          <button
+                            type="button"
+                            onClick={() => removeCitizenship(idx)}
+                            className="text-blue-600 hover:text-blue-800"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Role in Project */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <Briefcase className="h-4 w-4 inline mr-2" />
+                    Role in Project
+                  </label>
+                  <select
+                    name="role_in_project"
+                    value={formData.role_in_project}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">Select role</option>
+                    {roleOptions.map(role => (
+                      <option key={role} value={role}>{role}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Participant with Fewer Opportunities */}
+                <div>
+                  <label className="flex items-center space-x-3 cursor-pointer mb-3">
+                    <input
+                      type="checkbox"
+                      name="has_fewer_opportunities"
+                      checked={formData.has_fewer_opportunities}
+                      onChange={handleInputChange}
+                      className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Participant with fewer opportunities</span>
+                  </label>
+                  
+                  {formData.has_fewer_opportunities && (
+                    <div className="ml-8 mt-3 p-4 bg-gray-50 rounded-lg">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Fewer Opportunities Categories (Select all that apply)
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {fewerOpportunitiesOptions.map(option => (
+                          <label key={option} className="flex items-center space-x-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              name={`fewer_opp_${option}`}
+                              checked={formData.fewer_opportunities_categories.includes(option)}
+                              onChange={handleInputChange}
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">{option}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Languages */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <Languages className="h-4 w-4 inline mr-2" />
+                    Languages
+                  </label>
+                  <div className="flex gap-2 mb-2">
+                    <input
+                      type="text"
+                      value={newLanguage.language}
+                      onChange={(e) => setNewLanguage(prev => ({ ...prev, language: e.target.value }))}
+                      placeholder="Language"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                    <select
+                      value={newLanguage.level}
+                      onChange={(e) => setNewLanguage(prev => ({ ...prev, level: e.target.value }))}
+                      className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    >
+                      <option value="">Level</option>
+                      {languageLevels.map(level => (
+                        <option key={level} value={level}>{level}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={addLanguage}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                    >
+                      Add
+                    </button>
+                  </div>
+                  {formData.languages.length > 0 && (
+                    <div className="space-y-2">
+                      {formData.languages.map((lang, idx) => (
+                        <div key={idx} className="bg-blue-50 px-3 py-2 rounded-md flex items-center justify-between">
+                          <span className="text-sm text-gray-700">
+                            {lang.language} - {lang.level}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => removeLanguage(idx)}
+                            className="text-red-600 hover:text-red-800"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Target Groups */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Target Group for Participant (Select all that apply)
+                  </label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 p-4 border border-gray-300 rounded-lg">
+                    {targetGroupOptions.map(group => (
+                      <label key={group} className="flex items-center space-x-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          name={`target_group_${group}`}
+                          checked={formData.participant_target_groups.includes(group)}
+                          onChange={handleInputChange}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700">{group}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </>
             )}
 
@@ -405,7 +764,7 @@ export default function ProfilePage() {
                 placeholder={
                   profile.user_type === 'participant'
                     ? "Tell us about yourself, your interests, and what you're looking for..."
-                    : "Tell us about your organization, mission, and the opportunities you offer..."
+                    : "Tell us about your organization, mission, and the events you offer..."
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
               />

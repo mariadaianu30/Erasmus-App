@@ -14,7 +14,14 @@ import {
   Mail,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Image,
+  DollarSign,
+  Languages,
+  UtensilsCrossed,
+  Car,
+  Building2,
+  Tag
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/lib/utils'
@@ -32,6 +39,22 @@ interface Event {
   organization_name: string | null
   organization_website: string | null
   is_published: boolean
+  // New Erasmus+ fields
+  event_type?: string | null
+  venue_place?: string | null
+  city?: string | null
+  country?: string | null
+  short_description?: string | null
+  full_description?: string | null
+  photo_url?: string | null
+  is_funded?: boolean | null
+  target_groups?: any | null
+  group_size?: number | null
+  working_language?: string | null
+  participation_fee?: number | null
+  participation_fee_reason?: string | null
+  accommodation_food_details?: string | null
+  transport_details?: string | null
 }
 
 interface Application {
@@ -53,11 +76,22 @@ export default function EventDetailsPage() {
   const [motivationLetter, setMotivationLetter] = useState('')
   const [applying, setApplying] = useState(false)
   const [timeoutId, setTimeoutId] = useState<NodeJS.Timeout | null>(null)
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
 
   useEffect(() => {
     fetchEvent()
     checkUser()
   }, [params.id])
+
+  // Auto-dismiss toast after 3 seconds
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => {
+        setToast(null)
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [toast])
 
   const fetchEvent = async () => {
     try {
@@ -111,7 +145,7 @@ export default function EventDetailsPage() {
 
     // Validate motivation letter
     if (motivationLetter.trim().length === 0) {
-      alert('Please write a motivation letter.')
+      setToast({ message: 'Please write a motivation letter.', type: 'error' })
       return
     }
 
@@ -158,21 +192,21 @@ export default function EventDetailsPage() {
       setMotivationLetter('')
       
       // Show success message
-      alert('Application submitted successfully! The organization will review your application.')
+      setToast({ message: 'Application submitted successfully! The organization will review your application.', type: 'success' })
     } catch (error: any) {
       console.error('Error applying:', error)
       
       // Provide more specific error messages
       if (error?.message?.includes('timed out')) {
-        alert('Request timed out. Please check your connection and try again.')
+        setToast({ message: 'Request timed out. Please check your connection and try again.', type: 'error' })
       } else if (error?.message?.includes('Failed to fetch')) {
-        alert('Network error. Please check your internet connection and try again.')
+        setToast({ message: 'Network error. Please check your internet connection and try again.', type: 'error' })
       } else if (error?.code === '23505') {
-        alert('You have already applied to this event.')
+        setToast({ message: 'You have already applied to this event.', type: 'error' })
       } else if (error?.code === '23514') {
-        alert('Invalid data provided. Please check your motivation letter and try again.')
+        setToast({ message: 'Invalid data provided. Please check your motivation letter and try again.', type: 'error' })
       } else {
-        alert(`Failed to submit application: ${error?.message || 'Unknown error'}`)
+        setToast({ message: `Failed to submit application: ${error?.message || 'Unknown error'}`, type: 'error' })
       }
     } finally {
       setApplying(false)
@@ -242,6 +276,36 @@ export default function EventDetailsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 animate-slide-in">
+          <div
+            className={`flex items-center gap-3 px-6 py-4 rounded-lg shadow-lg max-w-md ${
+              toast.type === 'success'
+                ? 'bg-green-50 border border-green-200 text-green-800'
+                : toast.type === 'error'
+                ? 'bg-red-50 border border-red-200 text-red-800'
+                : 'bg-blue-50 border border-blue-200 text-blue-800'
+            }`}
+          >
+            {toast.type === 'success' ? (
+              <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
+            ) : toast.type === 'error' ? (
+              <XCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
+            ) : (
+              <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0" />
+            )}
+            <p className="text-sm font-medium flex-1">{toast.message}</p>
+            <button
+              onClick={() => setToast(null)}
+              className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+              aria-label="Close notification"
+            >
+              <XCircle className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Back Button */}
         <Link 
@@ -269,44 +333,212 @@ export default function EventDetailsPage() {
                   </div>
                 </div>
 
-                {/* Event Details */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  <div className="flex items-center text-gray-600">
-                    <Calendar className="h-5 w-5 mr-3 text-blue-600" />
-                    <div>
-                      <p className="font-medium">Start Date</p>
-                      <p className="text-sm">{formatDate(event.start_date)}</p>
+                {/* Event Details - Restructured */}
+                <div className="space-y-4 mb-6">
+                  {/* 2. Event Type */}
+                  {event.event_type && (
+                    <div className="flex items-center text-gray-600">
+                      <Tag className="h-5 w-5 mr-3 text-blue-600" />
+                      <div>
+                        <p className="font-medium">Event Type</p>
+                        <p className="text-sm">{event.event_type}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* 3. Begin date - end date */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-center text-gray-600">
+                      <Calendar className="h-5 w-5 mr-3 text-blue-600" />
+                      <div>
+                        <p className="font-medium">Begin Date</p>
+                        <p className="text-sm">{formatDate(event.start_date)}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center text-gray-600">
+                      <Clock className="h-5 w-5 mr-3 text-blue-600" />
+                      <div>
+                        <p className="font-medium">End Date</p>
+                        <p className="text-sm">{formatDate(event.end_date)}</p>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center text-gray-600">
-                    <Clock className="h-5 w-5 mr-3 text-blue-600" />
-                    <div>
-                      <p className="font-medium">End Date</p>
-                      <p className="text-sm">{formatDate(event.end_date)}</p>
+                  
+                  {/* 4. Venue place - city */}
+                  {(event.venue_place || event.city) && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {event.venue_place && (
+                        <div className="flex items-center text-gray-600">
+                          <MapPin className="h-5 w-5 mr-3 text-blue-600" />
+                          <div>
+                            <p className="font-medium">Venue Place</p>
+                            <p className="text-sm">{event.venue_place}</p>
+                          </div>
+                        </div>
+                      )}
+                      {event.city && (
+                        <div className="flex items-center text-gray-600">
+                          <MapPin className="h-5 w-5 mr-3 text-blue-600" />
+                          <div>
+                            <p className="font-medium">City</p>
+                            <p className="text-sm">{event.city}</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                  <div className="flex items-center text-gray-600">
-                    <MapPin className="h-5 w-5 mr-3 text-blue-600" />
-                    <div>
-                      <p className="font-medium">Location</p>
-                      <p className="text-sm">{event.location}</p>
+                  )}
+                  
+                  {/* 5. Country */}
+                  {event.country && (
+                    <div className="flex items-center text-gray-600">
+                      <Globe className="h-5 w-5 mr-3 text-blue-600" />
+                      <div>
+                        <p className="font-medium">Country</p>
+                        <p className="text-sm">{event.country}</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center text-gray-600">
-                    <Users className="h-5 w-5 mr-3 text-blue-600" />
-                    <div>
-                      <p className="font-medium">Max Participants</p>
-                      <p className="text-sm">{event.max_participants} people</p>
+                  )}
+                  
+                  {/* 11. Group Size */}
+                  {event.group_size && (
+                    <div className="flex items-center text-gray-600">
+                      <Users className="h-5 w-5 mr-3 text-blue-600" />
+                      <div>
+                        <p className="font-medium">Group Size</p>
+                        <p className="text-sm">{event.group_size} participants</p>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
-                {/* Description */}
-                <div className="prose max-w-none">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-3">About This Event</h3>
-                  <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-                    {event.description}
-                  </p>
+                {/* Photo */}
+                {event.photo_url && (
+                  <div className="mb-6">
+                    <img 
+                      src={event.photo_url} 
+                      alt={event.title}
+                      className="w-full h-64 object-cover rounded-lg"
+                    />
+                  </div>
+                )}
+
+                {/* 9. Funded (Yes / No) */}
+                {event.is_funded && (
+                  <div className="mb-6">
+                    <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                      ✓ Funded
+                    </span>
+                  </div>
+                )}
+
+                {/* 6. Short Description */}
+                {event.short_description && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Short Description</h3>
+                    <p className="text-gray-700 leading-relaxed">
+                      {event.short_description}
+                    </p>
+                  </div>
+                )}
+
+                {/* 7. Full Description */}
+                {event.full_description && (
+                  <div className="prose max-w-none mb-6">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-3">Full Description</h3>
+                    <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+                      {event.full_description}
+                    </p>
+                  </div>
+                )}
+
+                {/* Additional Event Details */}
+                <div className="border-t pt-6 space-y-4">
+                  {/* 10. Target Groups */}
+                  {event.target_groups && Array.isArray(event.target_groups) && event.target_groups.length > 0 && (
+                    <div>
+                      <h4 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                        <Users className="h-5 w-5 mr-2 text-blue-600" />
+                        Target Groups
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {event.target_groups.map((group: string, idx: number) => (
+                          <span key={idx} className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm">
+                            {group}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Group Size and Working Language */}
+                  {(event.group_size || event.working_language) && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {event.group_size && (
+                        <div className="flex items-center text-gray-700">
+                          <Users className="h-5 w-5 mr-3 text-blue-600" />
+                          <div>
+                            <p className="font-medium">Group Size</p>
+                            <p className="text-sm">{event.group_size} participants</p>
+                          </div>
+                        </div>
+                      )}
+                      {event.working_language && (
+                        <div className="flex items-center text-gray-700">
+                          <Languages className="h-5 w-5 mr-3 text-blue-600" />
+                          <div>
+                            <p className="font-medium">Working Language</p>
+                            <p className="text-sm">{event.working_language}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Participation Fee */}
+                  {event.participation_fee !== null && event.participation_fee !== undefined && (
+                    <div>
+                      <h4 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                        <DollarSign className="h-5 w-5 mr-2 text-blue-600" />
+                        Participation Fee
+                      </h4>
+                      <div className="space-y-2">
+                        <p className="text-gray-700">
+                          <span className="font-medium">Amount:</span> ${event.participation_fee.toFixed(2)}
+                        </p>
+                        {event.participation_fee_reason && (
+                          <p className="text-gray-600 text-sm">
+                            <span className="font-medium">Reason:</span> {event.participation_fee_reason}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Accommodation and Food */}
+                  {event.accommodation_food_details && (
+                    <div>
+                      <h4 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                        <UtensilsCrossed className="h-5 w-5 mr-2 text-blue-600" />
+                        Accommodation & Food
+                      </h4>
+                      <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+                        {event.accommodation_food_details}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Transport */}
+                  {event.transport_details && (
+                    <div>
+                      <h4 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                        <Car className="h-5 w-5 mr-2 text-blue-600" />
+                        Transport
+                      </h4>
+                      <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+                        {event.transport_details}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -391,7 +623,7 @@ export default function EventDetailsPage() {
                     )}
                     {application.status === 'rejected' && (
                       <p className="text-sm text-gray-600 mb-4">
-                        Thank you for your interest. Keep applying to other opportunities!
+                        Thank you for your interest. Keep applying to other events!
                       </p>
                     )}
                     <Link 

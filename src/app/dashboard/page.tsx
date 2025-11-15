@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { calculateAge } from '@/lib/utils'
-import { Calendar, Users, User, LogOut, Plus, Eye, Settings, TrendingUp, Clock, CheckCircle, XCircle, AlertCircle, Edit, Award } from 'lucide-react'
+import { Calendar, Users, User, LogOut, Plus, Eye, Settings, TrendingUp, Clock, CheckCircle, XCircle, AlertCircle, Edit, Award, Flag, MapPin, Briefcase, Languages, Mail } from 'lucide-react'
+import { countries } from '@/lib/countries'
 
 interface User {
   id: string
@@ -21,6 +22,17 @@ interface Profile {
   location?: string
   birth_date?: string
   website?: string
+  // Participant-specific fields
+  email?: string
+  gender?: 'female' | 'male' | 'undefined'
+  nationality?: string
+  citizenships?: string[]
+  residency_country?: string
+  role_in_project?: 'participant' | 'group leader' | 'trainer or facilitator'
+  has_fewer_opportunities?: boolean
+  fewer_opportunities_categories?: any
+  languages?: any
+  participant_target_groups?: any
 }
 
 interface Application {
@@ -58,8 +70,49 @@ export default function DashboardPage() {
     bio: '',
     location: '',
     birth_date: '',
-    website: ''
+    website: '',
+    // Participant-specific fields
+    email: '',
+    gender: '' as 'female' | 'male' | 'undefined' | '',
+    nationality: '',
+    citizenships: [] as string[],
+    residency_country: '',
+    role_in_project: '' as 'participant' | 'group leader' | 'trainer or facilitator' | '',
+    has_fewer_opportunities: false,
+    fewer_opportunities_categories: [] as string[],
+    languages: [] as Array<{language: string, level: string}>,
+    participant_target_groups: [] as string[]
   })
+  const [newLanguage, setNewLanguage] = useState({ language: '', level: '' })
+  const [newCitizenship, setNewCitizenship] = useState('')
+
+  const genderOptions = ['female', 'male', 'undefined']
+  const roleOptions = ['participant', 'group leader', 'trainer or facilitator']
+  const fewerOpportunitiesOptions = [
+    'Discrimination',
+    'Education',
+    'Cultural',
+    'Disabilities',
+    'Economical',
+    'Geographical',
+    'Health',
+    'Social'
+  ]
+  const targetGroupOptions = [
+    'Youth',
+    'Youth workers',
+    'Trainers',
+    'Youth leaders',
+    'Project managers',
+    'Policy makers',
+    'Volunteering',
+    'Mentors',
+    'Coaches',
+    'Researchers',
+    'Authorities',
+    'Others'
+  ]
+  const languageLevels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'Native']
   const [profileUpdateLoading, setProfileUpdateLoading] = useState(false)
   const [profileUpdateMessage, setProfileUpdateMessage] = useState('')
   const router = useRouter()
@@ -82,10 +135,10 @@ export default function DashboardPage() {
 
         setUser(session.user)
         
-        // Fetch user profile
+        // Fetch user profile with all fields
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('user_type, first_name, last_name, organization_name, bio, location, birth_date, website')
+          .select('*')
           .eq('id', session.user.id)
           .single()
 
@@ -106,7 +159,7 @@ export default function DashboardPage() {
                   user_type: (userMeta.user_type || 'participant') as any,
                   first_name: userMeta.first_name || '',
                   last_name: userMeta.last_name || '',
-                  birth_date: userMeta.birth_date || new Date(Date.now() - 18 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                  birthdate: userMeta.birth_date || new Date(Date.now() - 18 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
                   organization_name: userMeta.organization_name || null
                 })
               
@@ -114,7 +167,7 @@ export default function DashboardPage() {
                 // Fetch the newly created/updated profile
         const { data: newProfileData } = await supabase
           .from('profiles')
-          .select('user_type, first_name, last_name, organization_name, bio, location, birth_date, website')
+          .select('*')
           .eq('id', session.user.id)
           .single()
                 
@@ -136,13 +189,28 @@ export default function DashboardPage() {
           }
           
           // Populate profile form
+          const languages = Array.isArray(profileData.languages) ? profileData.languages : []
+          const citizenships = Array.isArray(profileData.citizenships) ? profileData.citizenships : []
+          const fewerOpps = Array.isArray(profileData.fewer_opportunities_categories) ? profileData.fewer_opportunities_categories : []
+          const targetGroups = Array.isArray(profileData.participant_target_groups) ? profileData.participant_target_groups : []
+          
           setProfileForm({
             first_name: profileData.first_name || '',
             last_name: profileData.last_name || '',
             bio: profileData.bio || '',
             location: profileData.location || '',
-            birth_date: profileData.birth_date || '',
-            website: profileData.website || ''
+            birth_date: profileData.birth_date || profileData.birthdate || '',
+            website: profileData.website || '',
+            email: profileData.email || '',
+            gender: profileData.gender || '',
+            nationality: profileData.nationality || '',
+            citizenships: citizenships,
+            residency_country: profileData.residency_country || '',
+            role_in_project: profileData.role_in_project || '',
+            has_fewer_opportunities: profileData.has_fewer_opportunities || false,
+            fewer_opportunities_categories: fewerOpps,
+            languages: languages,
+            participant_target_groups: targetGroups
           })
           
           // Fetch applications for participants
@@ -222,8 +290,21 @@ export default function DashboardPage() {
   }
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    router.push('/')
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        console.error('Error signing out:', error)
+        return
+      }
+      // Clear local state
+      setUser(null)
+      setProfile(null)
+      // Redirect to home page
+      router.push('/')
+      router.refresh()
+    } catch (error) {
+      console.error('Error signing out:', error)
+    }
   }
 
   const handleProfileUpdate = async (e: React.FormEvent) => {
@@ -243,16 +324,32 @@ export default function DashboardPage() {
       // Handle website field - simple cleanup
       const websiteValue = profileForm.website?.trim() || null;
 
+      const updateData: any = {
+        first_name: profileForm.first_name,
+        last_name: profileForm.last_name,
+        bio: profileForm.bio,
+        location: profileForm.location,
+        birthdate: profileForm.birth_date || null,
+        website: websiteValue
+      }
+
+      // Add participant-specific fields if user is a participant
+      if (profile?.user_type === 'participant') {
+        updateData.email = profileForm.email.trim() || null
+        updateData.gender = profileForm.gender || null
+        updateData.nationality = profileForm.nationality.trim() || null
+        updateData.citizenships = profileForm.citizenships.length > 0 ? profileForm.citizenships : null
+        updateData.residency_country = profileForm.residency_country.trim() || null
+        updateData.role_in_project = profileForm.role_in_project || null
+        updateData.has_fewer_opportunities = profileForm.has_fewer_opportunities
+        updateData.fewer_opportunities_categories = profileForm.fewer_opportunities_categories.length > 0 ? profileForm.fewer_opportunities_categories : null
+        updateData.languages = profileForm.languages.length > 0 ? profileForm.languages : null
+        updateData.participant_target_groups = profileForm.participant_target_groups.length > 0 ? profileForm.participant_target_groups : null
+      }
+
       const { error } = await supabase
         .from('profiles')
-        .update({
-          first_name: profileForm.first_name,
-          last_name: profileForm.last_name,
-          bio: profileForm.bio,
-          location: profileForm.location,
-          birth_date: profileForm.birth_date || null,
-          website: websiteValue
-        })
+        .update(updateData)
         .eq('id', user.id)
 
 
@@ -265,7 +362,7 @@ export default function DashboardPage() {
         // Refresh profile data
         const { data: updatedProfile } = await supabase
           .from('profiles')
-          .select('user_type, first_name, last_name, organization_name, bio, location, birth_date, website')
+          .select('*')
           .eq('id', user.id)
           .single()
         
@@ -281,24 +378,91 @@ export default function DashboardPage() {
     }
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target
+    const checked = (e.target as HTMLInputElement).checked
+    
+    setProfileForm(prev => {
+      if (type === 'checkbox') {
+        if (name === 'has_fewer_opportunities') {
+          return { ...prev, [name]: checked }
+        }
+        // Handle checkbox arrays
+        if (name.startsWith('fewer_opp_') || name.startsWith('target_group_')) {
+          const key = name.startsWith('fewer_opp_') ? 'fewer_opportunities_categories' : 'participant_target_groups'
+          const item = name.replace('fewer_opp_', '').replace('target_group_', '')
+          const current = prev[key as keyof typeof prev] as string[]
+          if (checked) {
+            return { ...prev, [key]: [...current, item] }
+          } else {
+            return { ...prev, [key]: current.filter(i => i !== item) }
+          }
+        }
+        return { ...prev, [name]: checked }
+      }
+      return { ...prev, [name]: value }
+    })
+  }
+
+  const addLanguage = () => {
+    if (newLanguage.language && newLanguage.level) {
+      setProfileForm(prev => ({
+        ...prev,
+        languages: [...prev.languages, { language: newLanguage.language, level: newLanguage.level }]
+      }))
+      setNewLanguage({ language: '', level: '' })
+    }
+  }
+
+  const removeLanguage = (index: number) => {
     setProfileForm(prev => ({
       ...prev,
-      [name]: value
+      languages: prev.languages.filter((_, i) => i !== index)
+    }))
+  }
+
+  const addCitizenship = () => {
+    if (newCitizenship.trim()) {
+      setProfileForm(prev => ({
+        ...prev,
+        citizenships: [...prev.citizenships, newCitizenship.trim()]
+      }))
+      setNewCitizenship('')
+    }
+  }
+
+  const removeCitizenship = (index: number) => {
+    setProfileForm(prev => ({
+      ...prev,
+      citizenships: prev.citizenships.filter((_, i) => i !== index)
     }))
   }
 
   const handleEditProfileClick = () => {
     // Populate form with current profile data when starting to edit
     if (profile) {
+      const languages = Array.isArray(profile.languages) ? profile.languages : []
+      const citizenships = Array.isArray(profile.citizenships) ? profile.citizenships : []
+      const fewerOpps = Array.isArray(profile.fewer_opportunities_categories) ? profile.fewer_opportunities_categories : []
+      const targetGroups = Array.isArray(profile.participant_target_groups) ? profile.participant_target_groups : []
+      
       setProfileForm({
         first_name: profile.first_name || '',
         last_name: profile.last_name || '',
         bio: profile.bio || '',
         location: profile.location || '',
-        birth_date: profile.birth_date || '',
-        website: profile.website || ''
+        birth_date: profile.birth_date || profile.birthdate || '',
+        website: profile.website || '',
+        email: profile.email || '',
+        gender: profile.gender || '',
+        nationality: profile.nationality || '',
+        citizenships: citizenships,
+        residency_country: profile.residency_country || '',
+        role_in_project: profile.role_in_project || '',
+        has_fewer_opportunities: profile.has_fewer_opportunities || false,
+        fewer_opportunities_categories: fewerOpps,
+        languages: languages,
+        participant_target_groups: targetGroups
       })
     }
     setIsEditingProfile(true)
@@ -409,6 +573,59 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Stats Overview - Only for participants */}
+        {profile.user_type === 'participant' && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <div className="flex items-center">
+                <div className="bg-blue-100 p-3 rounded-full">
+                  <TrendingUp className="h-6 w-6 text-blue-600" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Total Applications</p>
+                  <p className="text-2xl font-bold text-gray-900">{applicationStats.total}</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <div className="flex items-center">
+                <div className="bg-yellow-100 p-3 rounded-full">
+                  <Clock className="h-6 w-6 text-yellow-600" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Pending</p>
+                  <p className="text-2xl font-bold text-gray-900">{applicationStats.pending}</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <div className="flex items-center">
+                <div className="bg-green-100 p-3 rounded-full">
+                  <CheckCircle className="h-6 w-6 text-green-600" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Accepted</p>
+                  <p className="text-2xl font-bold text-gray-900">{applicationStats.accepted}</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <div className="flex items-center">
+                <div className="bg-red-100 p-3 rounded-full">
+                  <XCircle className="h-6 w-6 text-red-600" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Rejected</p>
+                  <p className="text-2xl font-bold text-gray-900">{applicationStats.rejected}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Profile Editing Section */}
         <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
           <div className="flex items-center justify-between mb-6">
@@ -510,6 +727,257 @@ export default function DashboardPage() {
                   />
               </div>
 
+              {/* Participant-specific fields */}
+              {profile?.user_type === 'participant' && (
+                <>
+                  <div className="border-t pt-6 mt-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Additional Information</h3>
+                    
+                    {/* Email */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <Mail className="h-4 w-4 inline mr-1" />
+                        Email
+                      </label>
+                      <input
+                        type="email"
+                        name="email"
+                        value={profileForm.email}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="your.email@example.com"
+                      />
+                    </div>
+
+                    {/* Gender */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Gender
+                      </label>
+                      <select
+                        name="gender"
+                        value={profileForm.gender}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select gender</option>
+                        {genderOptions.map(option => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Nationality and Residency */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <Flag className="h-4 w-4 inline mr-1" />
+                          Nationality
+                        </label>
+                        <select
+                          name="nationality"
+                          value={profileForm.nationality}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Select nationality</option>
+                          {countries.map(country => (
+                            <option key={country} value={country}>{country}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <MapPin className="h-4 w-4 inline mr-1" />
+                          Residency Country
+                        </label>
+                        <select
+                          name="residency_country"
+                          value={profileForm.residency_country}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Select country</option>
+                          {countries.map(country => (
+                            <option key={country} value={country}>{country}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Citizenships */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Citizenships
+                      </label>
+                      <div className="flex gap-2 mb-2">
+                        <select
+                          value={newCitizenship}
+                          onChange={(e) => setNewCitizenship(e.target.value)}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Select citizenship to add</option>
+                          {countries.filter(c => !profileForm.citizenships.includes(c)).map(country => (
+                            <option key={country} value={country}>{country}</option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={addCitizenship}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                        >
+                          Add
+                        </button>
+                      </div>
+                      {profileForm.citizenships.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {profileForm.citizenships.map((citizenship, idx) => (
+                            <span key={idx} className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm flex items-center gap-2">
+                              {citizenship}
+                              <button
+                                type="button"
+                                onClick={() => removeCitizenship(idx)}
+                                className="text-blue-600 hover:text-blue-800"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Role in Project */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <Briefcase className="h-4 w-4 inline mr-1" />
+                        Role in Project
+                      </label>
+                      <select
+                        name="role_in_project"
+                        value={profileForm.role_in_project}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select role</option>
+                        {roleOptions.map(role => (
+                          <option key={role} value={role}>{role}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Languages */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <Languages className="h-4 w-4 inline mr-1" />
+                        Languages
+                      </label>
+                      <div className="flex gap-2 mb-2">
+                        <input
+                          type="text"
+                          value={newLanguage.language}
+                          onChange={(e) => setNewLanguage(prev => ({ ...prev, language: e.target.value }))}
+                          placeholder="Language"
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <select
+                          value={newLanguage.level}
+                          onChange={(e) => setNewLanguage(prev => ({ ...prev, level: e.target.value }))}
+                          className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Level</option>
+                          {languageLevels.map(level => (
+                            <option key={level} value={level}>{level}</option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={addLanguage}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                        >
+                          Add
+                        </button>
+                      </div>
+                      {profileForm.languages.length > 0 && (
+                        <div className="space-y-2">
+                          {profileForm.languages.map((lang, idx) => (
+                            <div key={idx} className="bg-blue-50 px-3 py-2 rounded-md flex items-center justify-between">
+                              <span className="text-sm text-gray-700">
+                                {lang.language} - {lang.level}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => removeLanguage(idx)}
+                                className="text-red-600 hover:text-red-800"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Participant with Fewer Opportunities */}
+                    <div className="mb-4">
+                      <label className="flex items-center space-x-3 cursor-pointer mb-2">
+                        <input
+                          type="checkbox"
+                          name="has_fewer_opportunities"
+                          checked={profileForm.has_fewer_opportunities}
+                          onChange={handleInputChange}
+                          className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-sm font-medium text-gray-700">Participant with fewer opportunities</span>
+                      </label>
+                      
+                      {profileForm.has_fewer_opportunities && (
+                        <div className="ml-8 mt-3 p-4 bg-gray-50 rounded-lg">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Fewer Opportunities Categories (Select all that apply)
+                          </label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {fewerOpportunitiesOptions.map(option => (
+                              <label key={option} className="flex items-center space-x-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  name={`fewer_opp_${option}`}
+                                  checked={profileForm.fewer_opportunities_categories.includes(option)}
+                                  onChange={handleInputChange}
+                                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                />
+                                <span className="text-sm text-gray-700">{option}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Target Groups */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Target Group for Participant (Select all that apply)
+                      </label>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 p-4 border border-gray-300 rounded-lg">
+                        {targetGroupOptions.map(group => (
+                          <label key={group} className="flex items-center space-x-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              name={`target_group_${group}`}
+                              checked={profileForm.participant_target_groups.includes(group)}
+                              onChange={handleInputChange}
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">{group}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
               {profileUpdateMessage && (
                 <div className={`p-3 rounded-md ${
                   profileUpdateMessage.includes('successfully') 
@@ -538,35 +1006,154 @@ export default function DashboardPage() {
               </div>
             </form>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-6">
+              {/* Basic Information */}
               <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-1">Name</h3>
-                <p className="text-gray-900">{profile?.first_name} {profile?.last_name}</p>
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Basic Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="text-xs font-medium text-gray-500 mb-1">First Name</h4>
+                    <p className="text-gray-900">{profile?.first_name || 'Not specified'}</p>
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-medium text-gray-500 mb-1">Last Name (Family Name)</h4>
+                    <p className="text-gray-900">{profile?.last_name || 'Not specified'}</p>
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-medium text-gray-500 mb-1">Email</h4>
+                    <p className="text-gray-900">{profile?.email || user?.email || 'Not specified'}</p>
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-medium text-gray-500 mb-1">Age</h4>
+                    <p className="text-gray-900">
+                      {profile?.birth_date ? calculateAge(profile.birth_date) + ' years old' : 'Not specified'}
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-medium text-gray-500 mb-1">Gender</h4>
+                    <p className="text-gray-900">{profile?.gender || 'Not specified'}</p>
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-medium text-gray-500 mb-1">Location</h4>
+                    <p className="text-gray-900">{profile?.location || 'Not specified'}</p>
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-medium text-gray-500 mb-1">Website</h4>
+                    <p className="text-gray-900">
+                      {profile?.website ? (
+                        <a href={profile.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                          {profile.website}
+                        </a>
+                      ) : 'Not specified'}
+                    </p>
+                  </div>
+                </div>
+                {profile?.bio && (
+                  <div className="mt-4">
+                    <h4 className="text-xs font-medium text-gray-500 mb-1">Bio</h4>
+                    <p className="text-gray-900">{profile.bio}</p>
+                  </div>
+                )}
               </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-1">Age</h3>
-                <p className="text-gray-900">
-                  {profile?.birth_date ? calculateAge(profile.birth_date) + ' years old' : 'Not specified'}
-                </p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-1">Location</h3>
-                <p className="text-gray-900">{profile?.location || 'Not specified'}</p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-1">Website</h3>
-                <p className="text-gray-900">
-                  {profile?.website ? (
-                    <a href={profile.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                      {profile.website}
-                    </a>
-                  ) : 'Not specified'}
-                </p>
-              </div>
-              <div className="md:col-span-2">
-                <h3 className="text-sm font-medium text-gray-500 mb-1">Bio</h3>
-                <p className="text-gray-900">{profile?.bio || 'No bio provided'}</p>
-              </div>
+
+              {/* Participant-specific fields */}
+              {profile?.user_type === 'participant' && (
+                <>
+                  {/* Nationality & Citizenship */}
+                  {(profile?.nationality || profile?.citizenships || profile?.residency_country) && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 mb-3">Nationality & Location</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {profile?.nationality && (
+                          <div>
+                            <h4 className="text-xs font-medium text-gray-500 mb-1">Nationality</h4>
+                            <p className="text-gray-900">{profile.nationality}</p>
+                          </div>
+                        )}
+                        {profile?.residency_country && (
+                          <div>
+                            <h4 className="text-xs font-medium text-gray-500 mb-1">Residency Country</h4>
+                            <p className="text-gray-900">{profile.residency_country}</p>
+                          </div>
+                        )}
+                        {profile?.citizenships && Array.isArray(profile.citizenships) && profile.citizenships.length > 0 && (
+                          <div className="md:col-span-2">
+                            <h4 className="text-xs font-medium text-gray-500 mb-1">Citizenships</h4>
+                            <div className="flex flex-wrap gap-2">
+                              {profile.citizenships.map((citizenship: string, idx: number) => (
+                                <span key={idx} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                                  {citizenship}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Role & Languages */}
+                  {(profile?.role_in_project || (profile?.languages && Array.isArray(profile.languages) && profile.languages.length > 0)) && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 mb-3">Role & Languages</h3>
+                      <div className="space-y-4">
+                        {profile?.role_in_project && (
+                          <div>
+                            <h4 className="text-xs font-medium text-gray-500 mb-1">Role in Project</h4>
+                            <p className="text-gray-900">{profile.role_in_project}</p>
+                          </div>
+                        )}
+                        {profile?.languages && Array.isArray(profile.languages) && profile.languages.length > 0 && (
+                          <div>
+                            <h4 className="text-xs font-medium text-gray-500 mb-1">Languages</h4>
+                            <div className="flex flex-wrap gap-2">
+                              {profile.languages.map((lang: any, idx: number) => (
+                                <span key={idx} className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
+                                  {lang.language} - {lang.level}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Target Groups */}
+                  {profile?.participant_target_groups && Array.isArray(profile.participant_target_groups) && profile.participant_target_groups.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 mb-3">Target Groups</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {profile.participant_target_groups.map((group: string, idx: number) => (
+                          <span key={idx} className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs">
+                            {group}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Fewer Opportunities */}
+                  {profile?.has_fewer_opportunities && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 mb-3">Fewer Opportunities</h3>
+                      <p className="text-sm text-gray-600 mb-2">Participant with fewer opportunities: Yes</p>
+                      {profile?.fewer_opportunities_categories && Array.isArray(profile.fewer_opportunities_categories) && profile.fewer_opportunities_categories.length > 0 && (
+                        <div>
+                          <h4 className="text-xs font-medium text-gray-500 mb-1">Categories</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {profile.fewer_opportunities_categories.map((category: string, idx: number) => (
+                              <span key={idx} className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs">
+                                {category}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
         </div>
@@ -574,57 +1161,6 @@ export default function DashboardPage() {
         {/* Dashboard Content */}
         {profile.user_type === 'participant' ? (
           <div className="space-y-8">
-            {/* Stats Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="bg-white rounded-lg shadow-sm border p-6">
-                <div className="flex items-center">
-                  <div className="bg-blue-100 p-3 rounded-full">
-                    <TrendingUp className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Total Applications</p>
-                    <p className="text-2xl font-bold text-gray-900">{applicationStats.total}</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-white rounded-lg shadow-sm border p-6">
-                <div className="flex items-center">
-                  <div className="bg-yellow-100 p-3 rounded-full">
-                    <Clock className="h-6 w-6 text-yellow-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Pending</p>
-                    <p className="text-2xl font-bold text-gray-900">{applicationStats.pending}</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-white rounded-lg shadow-sm border p-6">
-                <div className="flex items-center">
-                  <div className="bg-green-100 p-3 rounded-full">
-                    <CheckCircle className="h-6 w-6 text-green-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Accepted</p>
-                    <p className="text-2xl font-bold text-gray-900">{applicationStats.accepted}</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-white rounded-lg shadow-sm border p-6">
-                <div className="flex items-center">
-                  <div className="bg-red-100 p-3 rounded-full">
-                    <XCircle className="h-6 w-6 text-red-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Rejected</p>
-                    <p className="text-2xl font-bold text-gray-900">{applicationStats.rejected}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Quick Actions */}
               <div className="bg-white rounded-lg shadow-sm border p-6">
@@ -635,7 +1171,7 @@ export default function DashboardPage() {
                     className="w-full flex items-center justify-center px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 transition-colors"
                   >
                     <Calendar className="h-5 w-5 mr-2" />
-                    Browse Opportunities
+                    Browse Events
                   </Link>
                   <Link
                     href="/my-applications"
@@ -662,7 +1198,7 @@ export default function DashboardPage() {
                     <div className="text-center py-4">
                       <AlertCircle className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                       <p className="text-gray-500 text-sm">No applications yet</p>
-                      <p className="text-gray-400 text-xs mt-1">Start by browsing opportunities!</p>
+                      <p className="text-gray-400 text-xs mt-1">Start by browsing events!</p>
                     </div>
                   ) : (
                     applications.slice(0, 3).map((application) => (
@@ -704,7 +1240,7 @@ export default function DashboardPage() {
                         {application.status === 'rejected' && (
                           <div className="bg-gray-50 border border-gray-200 rounded p-2 mt-2">
                             <p className="text-xs text-gray-700">
-                              Thank you for your interest. Keep applying to other opportunities!
+                              Thank you for your interest. Keep applying to other events!
                             </p>
                           </div>
                         )}
@@ -774,7 +1310,7 @@ export default function DashboardPage() {
                     <Calendar className="h-6 w-6 text-blue-600" />
                   </div>
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Total Opportunities</p>
+                    <p className="text-sm font-medium text-gray-600">Total Events</p>
                     <p className="text-2xl font-bold text-gray-900">0</p>
                   </div>
                 </div>
@@ -786,7 +1322,7 @@ export default function DashboardPage() {
                     <TrendingUp className="h-6 w-6 text-green-600" />
                   </div>
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Active Opportunities</p>
+                    <p className="text-sm font-medium text-gray-600">Active Events</p>
                     <p className="text-2xl font-bold text-gray-900">0</p>
                   </div>
                 </div>
@@ -827,14 +1363,14 @@ export default function DashboardPage() {
                     className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                   >
                     <Plus className="h-5 w-5 mr-2" />
-                    Create Opportunity
+                    Create Event
                   </Link>
                   <Link
                     href="/events/manage"
                     className="w-full flex items-center justify-center px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 transition-colors"
                   >
                     <Calendar className="h-5 w-5 mr-2" />
-                    Manage Opportunities
+                    Manage Events
                   </Link>
                   <Link
                     href="/applications"
@@ -852,7 +1388,7 @@ export default function DashboardPage() {
                 <div className="text-center py-8">
                   <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-500 text-sm">No recent activity</p>
-                    <p className="text-gray-400 text-xs mt-2">Create your first opportunity to get started!</p>
+                    <p className="text-gray-400 text-xs mt-2">Create your first event to get started!</p>
                 </div>
               </div>
 

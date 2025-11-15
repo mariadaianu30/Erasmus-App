@@ -119,7 +119,7 @@ export default function Home() {
               Erasmus+ Connect
             </h1>
             <p className="text-lg sm:text-xl text-gray-600 mb-8 max-w-3xl mx-auto px-4">
-              Connect with verified opportunities, discover amazing events, and manage your applications with ease. 
+              Connect with verified events, discover amazing experiences, and manage your applications with ease. 
               Join young people and organizations building meaningful connections across Europe.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -134,7 +134,7 @@ export default function Home() {
                 href="/events"
                 className="border border-blue-600 text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors inline-flex items-center justify-center"
               >
-                Browse Opportunities
+                Browse Events
               </Link>
             </div>
           </div>
@@ -157,10 +157,10 @@ export default function Home() {
               <div className="text-3xl font-bold text-gray-900 mb-2">
                 {loading ? '...' : stats.upcomingEvents.toLocaleString()}
               </div>
-              <div className="text-gray-600">Upcoming Opportunities</div>
+              <div className="text-gray-600">Upcoming Events</div>
               {!loading && stats.totalEvents > 0 && (
                 <div className="text-sm text-gray-500 mt-1">
-                  {stats.totalEvents} total opportunities
+                  {stats.totalEvents} total events
                 </div>
               )}
             </div>
@@ -221,7 +221,7 @@ export default function Home() {
               Why Choose Erasmus+ Connect?
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              We're committed to creating meaningful connections through verified opportunities and quality experiences.
+              We're committed to creating meaningful connections through verified events and quality experiences.
             </p>
           </div>
 
@@ -231,10 +231,10 @@ export default function Home() {
               <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Calendar className="h-8 w-8 text-blue-600" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Verified Opportunities</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">Verified Events</h3>
               <p className="text-gray-600">
-                All opportunities are verified by Scout Society to ensure quality and authenticity. 
-                Discover trusted opportunities that match your interests and goals.
+                All events are verified by Scout Society to ensure quality and authenticity. 
+                Discover trusted events that match your interests and goals.
               </p>
             </div>
 
@@ -257,7 +257,7 @@ export default function Home() {
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-3">Easy Application Management</h3>
               <p className="text-gray-600">
-                Track your applications, manage your profile, and stay updated on opportunities. 
+                Track your applications, manage your profile, and stay updated on events. 
                 Everything you need in one intuitive platform.
               </p>
             </div>
@@ -296,8 +296,8 @@ export default function Home() {
                     <span className="text-blue-600 font-semibold text-sm">2</span>
                   </div>
                   <div>
-                  <h4 className="font-semibold text-gray-900">Discover Opportunities</h4>
-                  <p className="text-gray-600">Browse verified opportunities that match your interests.</p>
+                  <h4 className="font-semibold text-gray-900">Discover Events</h4>
+                  <p className="text-gray-600">Browse verified events that match your interests.</p>
                   </div>
                 </div>
                 <div className="flex items-start">
@@ -330,8 +330,8 @@ export default function Home() {
                     <span className="text-green-600 font-semibold text-sm">2</span>
                   </div>
                   <div>
-                  <h4 className="font-semibold text-gray-900">Create Opportunities</h4>
-                  <p className="text-gray-600">Design and publish opportunities with detailed descriptions and requirements.</p>
+                  <h4 className="font-semibold text-gray-900">Create Events</h4>
+                  <p className="text-gray-600">Design and publish events with detailed descriptions and requirements.</p>
                   </div>
                 </div>
                 <div className="flex items-start">

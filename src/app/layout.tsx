@@ -11,8 +11,8 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Erasmus+ Connect",
-  description: "Erasmus+ Connect by Scout Society - Connect with verified opportunities, discover events, and manage applications with ease.",
-  keywords: ["erasmus+", "scout society", "events", "community", "networking", "participants", "organizations", "verified opportunities"],
+  description: "Erasmus+ Connect by Scout Society - Connect with verified events, discover experiences, and manage applications with ease.",
+  keywords: ["erasmus+", "scout society", "events", "community", "networking", "participants", "organizations", "verified events"],
   viewport: "width=device-width, initial-scale=1, maximum-scale=5",
   themeColor: "#3b82f6",
 };
@@ -24,7 +24,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full">
-      <body className={`${inter.variable} font-sans h-full antialiased`}>
+      <body className={`${inter.variable} font-sans h-full antialiased`} suppressHydrationWarning>
         <div className="min-h-full flex flex-col">
           <Navbar />
           <main className="flex-1">

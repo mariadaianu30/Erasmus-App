@@ -142,8 +142,17 @@ export default function Navbar() {
 
   const handleSignOut = async () => {
     try {
-      await supabase.auth.signOut()
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        console.error('Error signing out:', error)
+        return
+      }
+      // Clear local state
+      setUser(null)
+      setProfile(null)
+      // Redirect to home page
       router.push('/')
+      router.refresh()
     } catch (error) {
       console.error('Error signing out:', error)
     }
@@ -217,14 +226,14 @@ export default function Navbar() {
   const getNavigationItems = () => {
     if (!user) {
       return [
-        { name: 'Opportunities', href: '/events' },
+        { name: 'Events', href: '/events' },
         { name: 'Organizations', href: '/organizations' },
         { name: 'Login/Register', href: '/auth' },
       ]
     }
 
     const baseItems = [
-      { name: 'Opportunities', href: '/events' },
+      { name: 'Events', href: '/events' },
       { name: 'Organizations', href: '/organizations' },
     ]
 
@@ -238,6 +247,7 @@ export default function Navbar() {
     if (profile?.user_type === 'organization') {
       return [
         ...baseItems,
+        { name: 'Projects', href: '/projects' },
         { name: 'Dashboard', href: '/dashboard/organization' },
       ]
     }
