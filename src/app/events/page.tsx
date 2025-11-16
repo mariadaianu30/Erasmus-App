@@ -19,13 +19,16 @@ interface Event {
   organization_website: string | null
   // New Erasmus+ fields
   event_type?: string | null
+  venue_place?: string | null
   city?: string | null
   country?: string | null
   short_description?: string | null
+  full_description?: string | null
   photo_url?: string | null
   is_funded?: boolean | null
   working_language?: string | null
   participation_fee?: number | null
+  group_size?: number | null
 }
 
 export default function EventsPage() {
