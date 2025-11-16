@@ -106,8 +106,8 @@ export default function ProfilePage() {
         const { data: { session }, error } = await supabase.auth.getSession()
         
         if (error) {
-          console.error('Session error:', error)
-          router.push('/auth')
+          setError('Session error. Please log in again.')
+          setLoading(false)
           return
         }
         
@@ -118,10 +118,8 @@ export default function ProfilePage() {
 
         setUser(session.user)
         await fetchProfile(session.user.id)
-      } catch (error) {
-        console.error('Profile page error:', error)
-        router.push('/auth')
-      } finally {
+      } catch (error: any) {
+        setError(`Error loading page: ${error?.message || 'Unknown error'}`)
         setLoading(false)
       }
     }
@@ -138,29 +136,52 @@ export default function ProfilePage() {
         .single()
 
       if (error) {
-        console.error('Error fetching profile:', error)
+        setError(`Failed to load profile: ${error.message}`)
+        setLoading(false)
         return
       }
 
-      if (data) {
-        // Redirect organizations to their specific profile page
-        if (data.user_type === 'organization') {
-          router.push('/profile/organization')
-          return
-        }
-        
-        setProfile(data)
-        
-        // Parse JSONB fields
-        const languages = Array.isArray(data.languages) ? data.languages : []
-        const citizenships = Array.isArray(data.citizenships) ? data.citizenships : []
-        const fewerOpps = Array.isArray(data.fewer_opportunities_categories) ? data.fewer_opportunities_categories : []
-        const targetGroups = Array.isArray(data.participant_target_groups) ? data.participant_target_groups : []
-        
+      if (!data) {
+        setError('Profile not found. Please contact support.')
+        setLoading(false)
+        return
+      }
+
+      setProfile(data)
+      setLoading(false)
+      
+      // Parse JSONB fields
+      const languages = Array.isArray(data.languages) ? data.languages : []
+      const citizenships = Array.isArray(data.citizenships) ? data.citizenships : []
+      const fewerOpps = Array.isArray(data.fewer_opportunities_categories) ? data.fewer_opportunities_categories : []
+      const targetGroups = Array.isArray(data.participant_target_groups) ? data.participant_target_groups : []
+      
+      // Set form data based on user type
+      if (data.user_type === 'organization') {
+        setFormData({
+          first_name: '',
+          last_name: '',
+          organization_name: data.organization_name || '',
+          bio: data.bio || '',
+          location: data.location || '',
+          birth_date: '',
+          website: data.website || '',
+          email: '',
+          gender: '',
+          nationality: '',
+          citizenships: [],
+          residency_country: '',
+          role_in_project: '',
+          has_fewer_opportunities: false,
+          fewer_opportunities_categories: [],
+          languages: [],
+          participant_target_groups: []
+        })
+      } else {
         setFormData({
           first_name: data.first_name || '',
           last_name: data.last_name || '',
-          organization_name: data.organization_name || '',
+          organization_name: '',
           bio: data.bio || '',
           location: data.location || '',
           birth_date: data.birth_date || '',
@@ -177,8 +198,9 @@ export default function ProfilePage() {
           participant_target_groups: targetGroups
         })
       }
-    } catch (error) {
-      console.error('Error fetching profile:', error)
+    } catch (error: any) {
+      setError(`Failed to load profile: ${error?.message || 'Unknown error'}`)
+      setLoading(false)
     }
   }
 
@@ -237,7 +259,15 @@ export default function ProfilePage() {
       }
 
       setSuccess('Profile updated successfully!')
-      await fetchProfile(user.id) // Refresh profile data
+      
+      // Redirect to dashboard after successful save
+      setTimeout(() => {
+        if (profile.user_type === 'organization') {
+          router.push('/dashboard/organization')
+        } else {
+          router.push('/dashboard')
+        }
+      }, 1000)
     } catch (error) {
       setError('Failed to update profile. Please try again.')
     } finally {
@@ -309,12 +339,12 @@ export default function ProfilePage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     )
   }
 
-  if (!user || !profile) {
+  if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -322,10 +352,50 @@ export default function ProfilePage() {
           <p className="text-gray-600 mb-4">You need to be logged in to edit your profile.</p>
           <button
             onClick={() => router.push('/auth')}
-            className="bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700"
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
           >
             Go to Login
           </button>
+        </div>
+      </div>
+    )
+  }
+
+  // If profile is not loaded yet, show loading or allow creating profile
+  if (!profile) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Profile Not Found</h2>
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-4">
+                {error}
+              </div>
+            )}
+            <p className="text-gray-600 mb-4">
+              Your profile could not be loaded. This might be a temporary issue.
+            </p>
+            <div className="flex gap-4">
+              <button
+                onClick={() => {
+                  setLoading(true)
+                  if (user) {
+                    fetchProfile(user.id)
+                  }
+                }}
+                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+              >
+                Retry Loading Profile
+              </button>
+              <Link
+                href={user ? '/dashboard/organization' : '/dashboard'}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+              >
+                Back to Dashboard
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -339,7 +409,7 @@ export default function ProfilePage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <Link
-                href="/dashboard"
+                href={profile?.user_type === 'organization' ? '/dashboard/organization' : '/dashboard'}
                 className="flex items-center text-gray-600 hover:text-gray-900 mr-4"
               >
                 <ArrowLeft className="h-5 w-5 mr-2" />
@@ -773,7 +843,7 @@ export default function ProfilePage() {
             {/* Submit Button */}
             <div className="flex justify-end space-x-4 pt-6 border-t">
               <Link
-                href="/dashboard"
+                href={profile?.user_type === 'organization' ? '/dashboard/organization' : '/dashboard'}
                 className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
               >
                 Cancel
@@ -781,7 +851,7 @@ export default function ProfilePage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="flex items-center px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
               >
                 {saving ? (
                   <>

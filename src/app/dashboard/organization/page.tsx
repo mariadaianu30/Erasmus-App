@@ -722,7 +722,7 @@ export default function OrganizationDashboard() {
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900">Organization Profile</h2>
               <Link
-                href="/profile/organization"
+                href="/profile"
                 className="text-blue-600 hover:text-blue-800 text-sm font-medium"
               >
                 Edit Profile

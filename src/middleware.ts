@@ -83,6 +83,7 @@ export async function middleware(request: NextRequest) {
   // For dashboard and profile pages specifically, be more lenient - let the client handle auth
   if (request.nextUrl.pathname === '/dashboard' || 
       request.nextUrl.pathname === '/dashboard/organization' ||
+      request.nextUrl.pathname === '/profile' ||
       request.nextUrl.pathname === '/profile/organization' ||
       request.nextUrl.pathname === '/events/create') {
     return response

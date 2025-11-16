@@ -16,6 +16,7 @@
 # next.js
 /.next/
 /out/
+/frontend/**/.next/
 
 # production
 /build
@@ -23,6 +24,8 @@
 # misc
 .DS_Store
 *.pem
+/frontend.zip
+/frontend/
 
 # debug
 npm-debug.log*

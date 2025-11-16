@@ -32,9 +32,41 @@ module.exports = {
           800: '#1e293b',
           900: '#0f172a',
         },
+        pastel: {
+          green: {
+            light: '#CFE8D9',
+            medium: '#A7DCC3',
+          },
+          blue: {
+            light: '#B7D8F5',
+            medium: '#A3C8E9',
+          },
+          beige: {
+            light: '#F3E8D8',
+            medium: '#E9DCC3',
+          },
+        },
+        elegant: {
+          navy: {
+            dark: '#0B1D3A',
+            medium: '#102949',
+          },
+          green: {
+            dark: '#0F3D3E',
+            medium: '#145454',
+          },
+          brown: {
+            light: '#C7B199',
+            medium: '#A6937A',
+          },
+          gray: {
+            blue: '#E8EDF2',
+            soft: '#F5F7FA',
+          },
+        },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-inter-tight)', 'Inter Tight', 'system-ui', 'sans-serif'],
       },
     },
   },
