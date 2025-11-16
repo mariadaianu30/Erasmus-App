@@ -487,7 +487,7 @@ export default function ProfilePage() {
                       name="first_name"
                       value={formData.first_name}
                       onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       required
                     />
                   </div>
@@ -500,7 +500,7 @@ export default function ProfilePage() {
                       name="last_name"
                       value={formData.last_name}
                       onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       required
                     />
                   </div>
@@ -518,7 +518,7 @@ export default function ProfilePage() {
                       value={formData.birth_date}
                       onChange={handleInputChange}
                       max={new Date().toISOString().split('T')[0]}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     {formData.birth_date && (
                       <p className="text-sm text-gray-500 mt-1">
@@ -537,7 +537,7 @@ export default function ProfilePage() {
                       value={formData.location}
                       onChange={handleInputChange}
                       placeholder="e.g., Munich, Germany"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                 </div>
@@ -551,7 +551,7 @@ export default function ProfilePage() {
                     name="gender"
                     value={formData.gender}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Select gender</option>
                     {genderOptions.map(option => (
@@ -571,7 +571,7 @@ export default function ProfilePage() {
                       name="nationality"
                       value={formData.nationality}
                       onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Select nationality</option>
                       {countries.map(country => (
@@ -588,7 +588,7 @@ export default function ProfilePage() {
                       name="residency_country"
                       value={formData.residency_country}
                       onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Select country</option>
                       {countries.map(country => (
@@ -607,7 +607,7 @@ export default function ProfilePage() {
                     <select
                       value={newCitizenship}
                       onChange={(e) => setNewCitizenship(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Select citizenship to add</option>
                       {countries.filter(c => !formData.citizenships.includes(c)).map(country => (
@@ -650,7 +650,7 @@ export default function ProfilePage() {
                     name="role_in_project"
                     value={formData.role_in_project}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Select role</option>
                     {roleOptions.map(role => (
@@ -707,12 +707,12 @@ export default function ProfilePage() {
                       value={newLanguage.language}
                       onChange={(e) => setNewLanguage(prev => ({ ...prev, language: e.target.value }))}
                       placeholder="Language"
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <select
                       value={newLanguage.level}
                       onChange={(e) => setNewLanguage(prev => ({ ...prev, level: e.target.value }))}
-                      className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Level</option>
                       {languageLevels.map(level => (
@@ -783,7 +783,7 @@ export default function ProfilePage() {
                     name="organization_name"
                     value={formData.organization_name}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   />
                 </div>
@@ -800,7 +800,7 @@ export default function ProfilePage() {
                       value={formData.location}
                       onChange={handleInputChange}
                       placeholder="e.g., Munich, Germany"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   <div>
@@ -813,7 +813,7 @@ export default function ProfilePage() {
                       value={formData.website}
                       onChange={handleInputChange}
                       placeholder="your-website.com or https://your-website.com"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                 </div>
@@ -836,7 +836,7 @@ export default function ProfilePage() {
                     ? "Tell us about yourself, your interests, and what you're looking for..."
                     : "Tell us about your organization, mission, and the events you offer..."
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 

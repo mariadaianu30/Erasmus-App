@@ -228,7 +228,6 @@ export default function Navbar() {
       return [
         { name: 'Events', href: '/events' },
         { name: 'Organizations', href: '/organizations' },
-        { name: 'Login/Register', href: '/auth' },
       ]
     }
 
@@ -262,7 +261,7 @@ export default function Navbar() {
           <div className="flex justify-between h-16">
             <div className="flex items-center">
               <Link href="/" className="flex items-center">
-                <Calendar className="h-8 w-8 text-primary-600" />
+                <Calendar className="h-8 w-8 text-blue-600" />
                 <div className="ml-2">
                   <div className="text-xl font-bold text-gray-900">Erasmus+ Connect</div>
                   <div className="text-xs text-gray-500 -mt-1">by Scout Society</div>
@@ -285,7 +284,7 @@ export default function Navbar() {
           {/* Logo */}
           <div className="flex items-center">
             <Link href="/" className="flex items-center">
-              <Calendar className="h-8 w-8 text-primary-600" />
+              <Calendar className="h-8 w-8 text-blue-600" />
               <div className="ml-2">
                 <div className="text-xl font-bold text-gray-900">Erasmus+ Connect</div>
                 <div className="text-xs text-gray-500 -mt-1">by Scout Society</div>
@@ -299,7 +298,7 @@ export default function Navbar() {
               <Link
                 key={item.name}
                 href={item.href}
-                className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
               >
                 {item.name}
               </Link>
@@ -312,7 +311,7 @@ export default function Navbar() {
               <div className="flex items-center space-x-4">
                 <Link
                   href="/profile"
-                  className="flex items-center text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  className="flex items-center text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
                 >
                   <User className="h-4 w-4 mr-2" />
                   {getDisplayName()}
@@ -341,7 +340,7 @@ export default function Navbar() {
           <div className="md:hidden flex items-center">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="text-gray-700 hover:text-primary-600 p-2 rounded-md"
+              className="text-gray-700 hover:text-blue-600 p-2 rounded-md"
             >
               {mobileMenuOpen ? (
                 <X className="h-6 w-6" />
@@ -361,18 +360,30 @@ export default function Navbar() {
                 <Link
                   key={item.name}
                   href={item.href}
-                  className="text-gray-700 hover:text-primary-600 block px-3 py-2 rounded-md text-base font-medium transition-colors"
+                  className="text-gray-700 hover:text-blue-600 block px-3 py-2 rounded-md text-base font-medium transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   {item.name}
                 </Link>
               ))}
               
+              {!user && (
+                <div className="border-t pt-2 mt-2">
+                  <Link
+                    href="/auth"
+                    className="block bg-blue-600 text-white px-4 py-2 rounded-md text-base font-medium hover:bg-blue-700 transition-colors text-center mx-3"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Login/Register
+                  </Link>
+                </div>
+              )}
+              
               {user && (
                 <div className="border-t pt-2 mt-2">
                   <Link
                     href="/profile"
-                    className="flex items-center text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-base font-medium transition-colors"
+                    className="flex items-center text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-base font-medium transition-colors"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     <User className="h-4 w-4 mr-2" />

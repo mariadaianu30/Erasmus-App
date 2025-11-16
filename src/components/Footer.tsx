@@ -9,7 +9,7 @@ export default function Footer() {
           {/* Brand Section */}
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center mb-4">
-              <Calendar className="h-8 w-8 text-primary-400" />
+              <Calendar className="h-8 w-8 text-blue-400" />
               <span className="ml-2 text-2xl font-bold">Event Platform</span>
             </div>
             <p className="text-gray-300 mb-6 max-w-md">
@@ -112,15 +112,15 @@ export default function Footer() {
         <div className="border-t border-gray-800 mt-8 pt-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="flex items-center">
-              <Mail className="h-5 w-5 text-primary-400 mr-3" />
+              <Mail className="h-5 w-5 text-blue-400 mr-3" />
               <span className="text-gray-300">support@eventplatform.com</span>
             </div>
             <div className="flex items-center">
-              <Phone className="h-5 w-5 text-primary-400 mr-3" />
+              <Phone className="h-5 w-5 text-blue-400 mr-3" />
               <span className="text-gray-300">+40757574545</span>
             </div>
             <div className="flex items-center">
-              <MapPin className="h-5 w-5 text-primary-400 mr-3" />
+              <MapPin className="h-5 w-5 text-blue-400 mr-3" />
               <span className="text-gray-300">Bucharest, RO</span>
             </div>
           </div>

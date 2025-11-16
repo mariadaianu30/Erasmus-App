@@ -150,7 +150,7 @@ export default function MyApplicationsPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     )
   }
@@ -163,7 +163,7 @@ export default function MyApplicationsPage() {
           <p className="text-gray-600 mb-4">You need to be logged in to view your applications.</p>
           <button
             onClick={() => router.push('/auth')}
-            className="bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700"
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
           >
             Go to Login
           </button>
@@ -196,14 +196,14 @@ export default function MyApplicationsPage() {
                   onClick={() => setFilter(tab.key as any)}
                   className={`py-4 px-1 border-b-2 font-medium text-sm ${
                     filter === tab.key
-                      ? 'border-primary-500 text-primary-600'
+                      ? 'border-blue-500 text-blue-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
                 >
                   {tab.label}
                   {tab.count > 0 && (
-                    <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${
-                      filter === tab.key ? 'bg-primary-100 text-primary-600' : 'bg-gray-100 text-gray-600'
+                    <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${ 
+                      filter === tab.key ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
                     }`}>
                       {tab.count}
                     </span>
@@ -231,7 +231,7 @@ export default function MyApplicationsPage() {
               {filter === 'all' && (
                 <Link
                   href="/events"
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
                 >
                   Browse Events
                 </Link>
@@ -352,7 +352,7 @@ export default function MyApplicationsPage() {
                         className="flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
                       >
                         <Eye className="h-4 w-4 mr-2" />
-                        View Opportunity
+                        View Event
                       </Link>
                     </div>
                   </div>

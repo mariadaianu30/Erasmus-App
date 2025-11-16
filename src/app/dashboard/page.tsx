@@ -471,7 +471,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     )
   }
@@ -484,7 +484,7 @@ export default function DashboardPage() {
           <p className="text-gray-600 mb-4">You need to be logged in to access this page.</p>
           <button
             onClick={() => router.push('/auth')}
-            className="bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700"
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
           >
             Go to Login
           </button>
@@ -1161,34 +1161,7 @@ export default function DashboardPage() {
         {/* Dashboard Content */}
         {profile.user_type === 'participant' ? (
           <div className="space-y-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Quick Actions */}
-              <div className="bg-white rounded-lg shadow-sm border p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-                <div className="space-y-3">
-                  <Link
-                    href="/events"
-                    className="w-full flex items-center justify-center px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 transition-colors"
-                  >
-                    <Calendar className="h-5 w-5 mr-2" />
-                    Browse Events
-                  </Link>
-                  <Link
-                    href="/my-applications"
-                    className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                  >
-                    <Eye className="h-5 w-5 mr-2" />
-                    My Applications
-                  </Link>
-                  <Link
-                    href="/profile"
-                    className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
-                  >
-                    <Edit className="h-5 w-5 mr-2" />
-                    Edit Profile
-                  </Link>
-                </div>
-              </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
               {/* Recent Applications */}
               <div className="bg-white rounded-lg shadow-sm border p-6">
