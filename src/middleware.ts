@@ -96,7 +96,12 @@ export async function middleware(request: NextRequest) {
 
   // Redirect authenticated users from auth routes
   if (isAuthRoute && session) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    const userType = session.user.user_metadata?.user_type
+    const defaultRoute =
+      userType === 'organization'
+        ? '/dashboard/organization'
+        : '/dashboard'
+    return NextResponse.redirect(new URL(defaultRoute, request.url))
   }
 
   return response

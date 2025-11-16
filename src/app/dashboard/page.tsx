@@ -136,50 +136,97 @@ export default function DashboardPage() {
         setUser(session.user)
         
         // Fetch user profile with all fields
-        const { data: profileData, error: profileError } = await supabase
+        let { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', session.user.id)
           .single()
 
         if (profileError) {
-          console.error('Profile error:', profileError)
-          
-          // If profile doesn't exist, try to create it
-          if (profileError.code === 'PGRST116' || profileError.message?.includes('No rows found')) {
+          const notFound =
+            profileError.code === 'PGRST116' ||
+            profileError.message?.toLowerCase().includes('no rows') ||
+            profileError.details?.toLowerCase().includes('no rows')
+
+          if (notFound) {
             try {
               // Get user metadata to extract names
               const { data: userData } = await supabase.auth.getUser()
               const userMeta = userData?.user?.user_metadata || {}
+              const participantDefaults = userMeta.participant_profile_defaults || {}
+              const organizationDefaults = userMeta.organization_profile_defaults || {}
+              const profileType = (userMeta.user_type || 'participant') as 'participant' | 'organization'
+
+              const baseProfile: any = {
+                id: session.user.id,
+                user_type: profileType,
+                first_name: participantDefaults.first_name ?? userMeta.first_name ?? '',
+                last_name: participantDefaults.last_name ?? userMeta.last_name ?? '',
+                email: participantDefaults.email ?? session.user.email ?? userMeta.email ?? '',
+                birthdate:
+                  participantDefaults.birthdate ??
+                  userMeta.birth_date ??
+                  new Date(Date.now() - 18 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              }
+
+              if (profileType === 'participant') {
+                baseProfile.gender = participantDefaults.gender ?? null
+                baseProfile.nationality = participantDefaults.nationality ?? null
+                baseProfile.citizenships = participantDefaults.citizenships ?? null
+                baseProfile.residency_country = participantDefaults.residency_country ?? null
+                baseProfile.role_in_project = participantDefaults.role_in_project ?? null
+                baseProfile.has_fewer_opportunities = participantDefaults.has_fewer_opportunities ?? false
+                baseProfile.fewer_opportunities_categories =
+                  participantDefaults.fewer_opportunities_categories ?? []
+                baseProfile.languages = participantDefaults.languages ?? []
+                baseProfile.participant_target_groups = participantDefaults.participant_target_groups ?? []
+              } else {
+                baseProfile.organization_name =
+                  organizationDefaults.organization_name ?? userMeta.organization_name ?? 'Organization'
+                baseProfile.bio = organizationDefaults.bio ?? null
+                baseProfile.location = organizationDefaults.location ?? null
+                baseProfile.website = organizationDefaults.website ?? null
+              }
               
               const { error: insertError } = await supabase
                 .from('profiles')
-                .upsert({
-                  id: session.user.id,
-                  user_type: (userMeta.user_type || 'participant') as any,
-                  first_name: userMeta.first_name || '',
-                  last_name: userMeta.last_name || '',
-                  birthdate: userMeta.birth_date || new Date(Date.now() - 18 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                  organization_name: userMeta.organization_name || null
-                })
+                .upsert(baseProfile)
               
-              if (!insertError) {
-                // Fetch the newly created/updated profile
-        const { data: newProfileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
-                
-                if (newProfileData) {
-                  setProfile(newProfileData)
-                }
+              if (insertError) {
+                console.warn('Profile insert deferred:', insertError)
               }
+
+              // Use the base profile immediately so the dashboard has data
+              profileData = baseProfile
+              profileError = null
+              setProfile(profileData)
+              setProfileForm(prev => ({
+                ...prev,
+                first_name: profileData.first_name || '',
+                last_name: profileData.last_name || '',
+                email: profileData.email || session.user.email || '',
+                birth_date: profileData.birthdate || prev.birth_date,
+                nationality: profileData.nationality || prev.nationality,
+                residency_country: profileData.residency_country || prev.residency_country,
+                role_in_project: profileData.role_in_project || prev.role_in_project,
+                languages: Array.isArray(profileData.languages) ? profileData.languages : prev.languages,
+              }))
+
+              // Kick off a background refresh to hydrate the rest
+              fetchApplications(session.user.id)
+              setLoading(false)
+              return
             } catch (createError) {
               console.error('Failed to create profile:', createError)
             }
+          } else {
+            console.error('Profile error:', profileError)
+            setLoading(false)
+            return
           }
-        } else if (profileData) {
+        }
+
+        if (profileData) {
           setProfile(profileData)
           
           // Redirect organizations to their dashboard
@@ -476,18 +523,23 @@ export default function DashboardPage() {
     )
   }
 
-  if (!user || !profile) {
+  if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h2>
-          <p className="text-gray-600 mb-4">You need to be logged in to access this page.</p>
-          <button
-            onClick={() => router.push('/auth')}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-          >
-            Go to Login
-          </button>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
+  if (!profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <h2 className="text-2xl font-bold text-gray-900">Setting up your dashboard…</h2>
+          <p className="text-gray-600">We’re finishing your profile. This may take a moment.</p>
+          <div className="flex justify-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+          </div>
         </div>
       </div>
     )

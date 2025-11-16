@@ -224,34 +224,26 @@ export default function Navbar() {
   }
 
   const getNavigationItems = () => {
-    if (!user) {
-      return [
-        { name: 'Events', href: '/events' },
-        { name: 'Organizations', href: '/organizations' },
-      ]
-    }
-
     const baseItems = [
       { name: 'Events', href: '/events' },
       { name: 'Organizations', href: '/organizations' },
     ]
 
-    if (profile?.user_type === 'participant') {
-      return [
-        ...baseItems,
-        { name: 'Dashboard', href: '/dashboard' },
-      ]
+    // Default dashboard tab (also covers logged out state)
+    const dashboardItem = {
+      name: 'Dashboard',
+      href: profile?.user_type === 'organization' ? '/dashboard/organization' : '/dashboard',
     }
 
-    if (profile?.user_type === 'organization') {
-      return [
-        ...baseItems,
-        { name: 'Projects', href: '/projects' },
-        { name: 'Dashboard', href: '/dashboard/organization' },
-      ]
+    if (!user || !profile) {
+      return [...baseItems, dashboardItem]
     }
 
-    return baseItems
+    if (profile.user_type === 'organization') {
+      return [...baseItems, dashboardItem, { name: 'Projects', href: '/projects' }]
+    }
+
+    return [...baseItems, dashboardItem]
   }
 
   if (loading) {

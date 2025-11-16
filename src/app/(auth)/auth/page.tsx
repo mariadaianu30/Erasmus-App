@@ -167,20 +167,51 @@ export default function AuthPage() {
         return
       }
 
+      const participantProfileDefaults =
+        formData.userType === 'participant'
+          ? {
+              first_name: formData.firstName.trim(),
+              last_name: formData.lastName.trim(),
+              email: formData.email,
+              birthdate: formData.birth_date || null,
+              gender: formData.gender || null,
+              nationality: formData.nationality.trim() || null,
+              citizenships: formData.citizenships.length > 0 ? formData.citizenships : null,
+              residency_country: formData.residency_country.trim() || null,
+              role_in_project: formData.role_in_project || null,
+              has_fewer_opportunities: formData.has_fewer_opportunities,
+              fewer_opportunities_categories:
+                formData.fewer_opportunities_categories.length > 0 ? formData.fewer_opportunities_categories : null,
+              languages: formData.languages.length > 0 ? formData.languages : null,
+              participant_target_groups:
+                formData.participant_target_groups.length > 0 ? formData.participant_target_groups : null,
+            }
+          : null
+
+      const metadata: Record<string, any> = {
+        first_name: formData.firstName.trim(),
+        last_name: formData.lastName.trim(),
+        user_type: formData.userType,
+        organization_name: formData.organizationName?.trim() || null,
+        birth_date: formData.birth_date || null,
+        participant_profile_defaults: participantProfileDefaults,
+        organization_profile_defaults:
+          formData.userType === 'organization'
+            ? {
+                organization_name: formData.organizationName?.trim() || '',
+                email: formData.email,
+              }
+            : null,
+      }
+
       // Registration logic
       try {
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: formData.email,
           password: formData.password,
           options: {
-            data: {
-              first_name: formData.firstName,
-              last_name: formData.lastName,
-              user_type: formData.userType,
-              organization_name: formData.organizationName,
-              birth_date: formData.birth_date || null,
-            }
-          }
+            data: metadata,
+          },
         })
 
         if (authError) {
@@ -189,13 +220,28 @@ export default function AuthPage() {
           return
         }
 
+        let hasActiveSession = !!authData.session
+
+        if (!hasActiveSession) {
+          const { error: autoSignInError, data: signInData } = await supabase.auth.signInWithPassword({
+            email: formData.email,
+            password: formData.password,
+          })
+
+          if (autoSignInError) {
+            console.warn('Auto sign-in after registration failed:', autoSignInError)
+          } else if (signInData.session) {
+            hasActiveSession = true
+          }
+        }
+
         // Create profile with all participant fields
-        if (authData.user && formData.userType === 'participant') {
+        if (authData.user && hasActiveSession && formData.userType === 'participant') {
           const profileData: any = {
             id: authData.user.id,
             user_type: 'participant',
-            first_name: formData.firstName,
-            last_name: formData.lastName,
+            first_name: formData.firstName.trim(),
+            last_name: formData.lastName.trim(),
             email: formData.email,
             birthdate: formData.birth_date || null,
             gender: formData.gender || null,
@@ -206,7 +252,7 @@ export default function AuthPage() {
             has_fewer_opportunities: formData.has_fewer_opportunities,
             fewer_opportunities_categories: formData.fewer_opportunities_categories.length > 0 ? formData.fewer_opportunities_categories : null,
             languages: formData.languages.length > 0 ? formData.languages : null,
-            participant_target_groups: formData.participant_target_groups.length > 0 ? formData.participant_target_groups : null
+            participant_target_groups: formData.participant_target_groups.length > 0 ? formData.participant_target_groups : null,
           }
 
           const { error: profileError } = await supabase
@@ -214,25 +260,34 @@ export default function AuthPage() {
             .upsert(profileData)
 
           if (profileError) {
-            console.error('Profile creation error:', profileError)
-            // Don't fail registration if profile creation fails - it can be created later
+            console.warn('Profile creation deferred:', profileError)
           }
-        } else if (authData.user && formData.userType === 'organization') {
-          // Create organization profile
+        } else if (authData.user && hasActiveSession && formData.userType === 'organization') {
+          const organizationProfile = {
+            id: authData.user.id,
+            user_type: 'organization',
+            organization_name: formData.organizationName?.trim() || '',
+            email: formData.email,
+          }
+
           const { error: profileError } = await supabase
             .from('profiles')
-            .upsert({
-              id: authData.user.id,
-              user_type: 'organization',
-              organization_name: formData.organizationName
-            })
+            .upsert(organizationProfile)
 
           if (profileError) {
-            console.error('Profile creation error:', profileError)
+            console.warn('Profile creation deferred:', profileError)
           }
         }
 
-        router.push('/dashboard')
+        if (authData.user && !hasActiveSession) {
+          console.info('Profile creation deferred until email confirmation/completion.')
+        }
+
+        const postSignUpDestination =
+          formData.userType === 'participant' ? '/dashboard' : '/dashboard/organization'
+
+        router.push(postSignUpDestination)
+        router.refresh()
       } catch (error) {
         setError('An unexpected error occurred')
       } finally {
@@ -834,4 +889,5 @@ export default function AuthPage() {
     </div>
   )
 }
+
 
