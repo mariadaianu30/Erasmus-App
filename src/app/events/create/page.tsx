@@ -200,9 +200,10 @@ export default function CreateEventPage() {
         }
       }
       if (name === 'participation_fee') {
+        // Keep as string in state to satisfy typing; convert on submit
         return {
           ...prev,
-          [name]: value === '' ? '' : parseFloat(value) || 0
+          [name]: value
         }
       }
       return {
