@@ -184,10 +184,10 @@ export default function CreateEventPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
-    const checked = (e.target as HTMLInputElement).checked
     
     setFormData(prev => {
       if (type === 'checkbox') {
+        const checked = (e.target as HTMLInputElement).checked
         return {
           ...prev,
           [name]: checked
@@ -202,7 +202,7 @@ export default function CreateEventPage() {
       if (name === 'participation_fee') {
         return {
           ...prev,
-          [name]: value === '' ? '' : parseFloat(value) || 0
+          [name]: value
         }
       }
       return {
