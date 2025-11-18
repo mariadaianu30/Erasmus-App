@@ -570,10 +570,10 @@ export default function DashboardPage() {
   }
 
   const profileCompletion = (() => {
-    const fields =
+    const fields: string[] =
       profile.user_type === 'participant'
-        ? PARTICIPANT_COMPLETION_FIELDS
-        : ORGANIZATION_COMPLETION_FIELDS
+        ? [...PARTICIPANT_COMPLETION_FIELDS]
+        : [...ORGANIZATION_COMPLETION_FIELDS]
 
     const fieldFilled = (field: string) => {
       const value = (profile as any)[field]
@@ -583,8 +583,8 @@ export default function DashboardPage() {
     }
 
     const filled = fields.filter(fieldFilled)
-    const percent =
-      fields.length === 0 ? 100 : Math.round((filled.length / fields.length) * 100)
+    const total = fields.length
+    const percent = total === 0 ? 100 : Math.round((filled.length / total) * 100)
     const missing = fields.filter(field => !fieldFilled(field))
     return { percent, missing }
   })()
