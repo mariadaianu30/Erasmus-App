@@ -38,6 +38,7 @@ interface Profile {
   bio?: string
   location?: string
   birth_date?: string
+  birthdate?: string
   website?: string
   // Participant-specific fields
   email?: string
