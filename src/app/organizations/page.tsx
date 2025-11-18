@@ -129,9 +129,11 @@ export default function OrganizationsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredOrganizations.map((org) => (
-              <div key={org.id} className="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow">
-                <div className="p-6">
+            {filteredOrganizations.map((org) => {
+              const website = org.organization_website ?? org.website ?? undefined
+              return (
+                <div key={org.id} className="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow">
+                  <div className="p-6">
                   <div className="flex items-start justify-between mb-3">
                     <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">{org.organization_name}</h3>
                     <div className="flex items-center ml-2">
@@ -161,16 +163,16 @@ export default function OrganizationsPage() {
                         {org.location}
                       </div>
                     )}
-                    {(org.organization_website || org.website) && (
+                    {website && (
                       <div className="flex items-center text-sm text-gray-500">
                         <Globe className="h-4 w-4 mr-2" />
                         <a 
-                          href={org.organization_website || org.website} 
+                          href={website} 
                           target="_blank" 
                           rel="noopener noreferrer"
                           className="text-blue-600 hover:text-blue-800 truncate"
                         >
-                          {(org.organization_website || org.website)?.replace(/^https?:\/\//, '')}
+                          {website.replace(/^https?:\/\//, '')}
                         </a>
                       </div>
                     )}
@@ -188,9 +190,10 @@ export default function OrganizationsPage() {
                   >
                     View Organization
                   </Link>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
