@@ -41,6 +41,8 @@ export default function CreateEventPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [timeoutId, setTimeoutId] = useState<NodeJS.Timeout | null>(null)
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
   const router = useRouter()
 
   // Form state - Restructured to match new event structure
@@ -212,6 +214,35 @@ export default function CreateEventPage() {
     })
   }
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) {
+      setImageFile(null)
+      setImagePreview(null)
+      return
+    }
+
+    if (file.type !== 'image/png') {
+      setError('Please upload a PNG image.')
+      setImageFile(null)
+      setImagePreview(null)
+      return
+    }
+
+    setError('')
+    setImageFile(file)
+    const previewUrl = URL.createObjectURL(file)
+    setImagePreview(previewUrl)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview)
+      }
+    }
+  }, [imagePreview])
+
 
   const handleTargetGroupChange = (group: string) => {
     setFormData(prev => {
@@ -296,6 +327,29 @@ export default function CreateEventPage() {
     setSuccess('')
 
     try {
+      let uploadedPhotoUrl: string | null = null
+
+      if (imageFile) {
+        const fileExtension = imageFile.name.split('.').pop() || 'png'
+        const filePath = `organizations/${user.id}/events/${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExtension}`
+        const { error: uploadError } = await supabase.storage
+          .from('event-images')
+          .upload(filePath, imageFile, {
+            cacheControl: '3600',
+            upsert: false
+          })
+
+        if (uploadError) {
+          throw new Error(uploadError.message || 'Failed to upload image')
+        }
+
+        const { data: publicData } = supabase.storage
+          .from('event-images')
+          .getPublicUrl(filePath)
+
+        uploadedPhotoUrl = publicData.publicUrl
+      }
+
       const eventData: any = {
         // Required fields
         title: formData.title.trim(),
@@ -312,7 +366,7 @@ export default function CreateEventPage() {
         country: formData.country.trim() || null,
         short_description: formData.short_description.trim() || null,
         full_description: formData.full_description.trim() || null,
-        photo_url: null, // Photo feature disabled for now
+        photo_url: uploadedPhotoUrl || formData.photo_url || null,
         is_funded: formData.is_funded,
         target_groups: formData.target_groups.length > 0 ? formData.target_groups : null,
         group_size: formData.group_size,
@@ -433,6 +487,8 @@ export default function CreateEventPage() {
         accommodation_food_details: '',
         transport_details: ''
       })
+      setImageFile(null)
+      setImagePreview(null)
 
       // Redirect to event details after 2 seconds
       setTimeout(() => {
@@ -704,8 +760,38 @@ export default function CreateEventPage() {
               />
             </div>
 
-            {/* 8. Photo extracted - DISABLED FOR NOW */}
-            {/* Photo feature temporarily disabled */}
+            {/* 8. Event cover image */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Image className="h-4 w-4 inline mr-2" />
+                Event Cover Image (PNG)
+              </label>
+              <div className="flex flex-col gap-3">
+                <input
+                  type="file"
+                  accept="image/png"
+                  onChange={handleImageChange}
+                  className="w-full px-4 py-2 border border-dashed border-gray-300 rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <p className="text-xs text-gray-500">
+                  Recommended 1200×630px PNG. This image will appear on the event card and detail page.
+                </p>
+                {(imagePreview || formData.photo_url) && (
+                  <div className="relative">
+                    <img
+                      src={imagePreview || formData.photo_url || undefined}
+                      alt="Event preview"
+                      className="w-full h-48 object-cover rounded-lg border border-gray-200"
+                    />
+                    {imagePreview && (
+                      <p className="text-xs text-gray-500 mt-2">
+                        Preview shown from the file you just selected.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
 
             {/* 9. Funded (Yes / No) */}
             <div>
@@ -979,10 +1065,10 @@ export default function CreateEventPage() {
                 )}
               </div>
               
-              {formData.photo_url && (
+              {(imagePreview || formData.photo_url) && (
                 <div className="mb-4">
                   <img
-                    src={formData.photo_url}
+                    src={imagePreview || formData.photo_url || undefined}
                     alt="Event photo"
                     className="w-full h-48 object-cover rounded-lg"
                     onError={(e) => {

@@ -25,10 +25,12 @@ import {
   Briefcase,
   Languages,
   Award,
-  ArrowLeft
+  ArrowLeft,
+  Download
 } from 'lucide-react'
 import Link from 'next/link'
 import Notification from '@/components/Notification'
+import { downloadCsvFile, participantToCsvRow, PARTICIPANT_CSV_HEADERS, ParticipantProfileForCsv } from '@/lib/csv'
 
 interface Event {
   id: string
@@ -67,6 +69,17 @@ interface Profile {
   location: string
 }
 
+interface AcceptedParticipantRecord {
+  application: {
+    id: string
+    participant_id: string
+    status: 'accepted'
+    motivation_letter: string | null
+    created_at: string
+  }
+  profile: ParticipantProfileForCsv | null
+}
+
 export default function OrganizationDashboard() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
@@ -85,8 +98,15 @@ export default function OrganizationDashboard() {
   const [selectedParticipant, setSelectedParticipant] = useState<any>(null)
   const [participantProfile, setParticipantProfile] = useState<any>(null)
   const [loadingProfile, setLoadingProfile] = useState(false)
+  const [downloadingParticipantCsv, setDownloadingParticipantCsv] = useState(false)
   const [activeTab, setActiveTab] = useState<'events' | 'applications'>('events')
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
+  const [acceptedModalVisible, setAcceptedModalVisible] = useState(false)
+  const [acceptedModalEvent, setAcceptedModalEvent] = useState<Event | null>(null)
+  const [acceptedModalParticipants, setAcceptedModalParticipants] = useState<AcceptedParticipantRecord[]>([])
+  const [acceptedModalLoading, setAcceptedModalLoading] = useState(false)
+  const [acceptedModalError, setAcceptedModalError] = useState<string | null>(null)
+  const [acceptedModalExporting, setAcceptedModalExporting] = useState(false)
 
   useEffect(() => {
     getSession()
@@ -273,6 +293,144 @@ export default function OrganizationDashboard() {
     await fetchParticipantProfile(participantId)
   }
 
+  const handleDownloadParticipantCsv = () => {
+    if (!participantProfile || !selectedParticipant) return
+
+    setDownloadingParticipantCsv(true)
+    try {
+      const row = participantToCsvRow(participantProfile, {
+        eventTitle: selectedParticipant.event_title,
+        eventId: selectedParticipant.event_id,
+        participantId: selectedParticipant.participant_id,
+        applicationStatus: selectedParticipant.status,
+        applicationDate: selectedParticipant.created_at,
+        motivationLetter: selectedParticipant.motivation_letter,
+        email: participantProfile.email || selectedParticipant.email
+      })
+
+      const safeNamePart = `${participantProfile.first_name || 'participant'}-${participantProfile.last_name || ''}`
+        .trim()
+        .replace(/[^a-z0-9]+/gi, '-')
+        .toLowerCase() || 'participant'
+
+      downloadCsvFile(
+        `${safeNamePart}-profile.csv`,
+        PARTICIPANT_CSV_HEADERS,
+        [row]
+      )
+      setNotification({ type: 'success', message: 'Participant data downloaded as CSV.' })
+    } catch (error) {
+      console.error('Error exporting participant CSV:', error)
+      setNotification({ type: 'error', message: 'Failed to export participant CSV.' })
+    } finally {
+      setDownloadingParticipantCsv(false)
+    }
+  }
+
+  const fetchAcceptedParticipantsForEvent = async (eventId: string) => {
+    const { data: applicationsData, error } = await supabase
+      .from('applications')
+      .select('id, participant_id, status, motivation_letter, created_at')
+      .eq('event_id', eventId)
+      .eq('status', 'accepted')
+
+    if (error) throw error
+
+    if (!applicationsData || applicationsData.length === 0) {
+      return []
+    }
+
+    const participantIds = applicationsData
+      .map((app) => app.participant_id)
+      .filter((id): id is string => Boolean(id))
+
+    let profilesMap = new Map<string, ParticipantProfileForCsv>()
+
+    if (participantIds.length > 0) {
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email, location, gender, birth_date, nationality, residency_country, citizenships, languages, participant_target_groups, has_fewer_opportunities, fewer_opportunities_categories, role_in_project, bio, website')
+        .in('id', participantIds)
+
+      if (profilesError) throw profilesError
+
+      profilesMap = new Map((profilesData || []).map((profile) => [profile.id, profile]))
+    }
+
+    return applicationsData.map((app) => ({
+      application: app as AcceptedParticipantRecord['application'],
+      profile: profilesMap.get(app.participant_id) || null
+    }))
+  }
+
+  const loadAcceptedParticipantsIntoModal = async (eventId: string) => {
+    setAcceptedModalLoading(true)
+    setAcceptedModalError(null)
+    try {
+      const participants = await fetchAcceptedParticipantsForEvent(eventId)
+      setAcceptedModalParticipants(participants)
+    } catch (error) {
+      console.error('Error fetching accepted participants:', error)
+      setAcceptedModalError('Failed to load accepted participants.')
+      setAcceptedModalParticipants([])
+    } finally {
+      setAcceptedModalLoading(false)
+    }
+  }
+
+  const handleOpenAcceptedModalForEvent = async (event: Event) => {
+    setAcceptedModalVisible(true)
+    setAcceptedModalEvent(event)
+    await loadAcceptedParticipantsIntoModal(event.id)
+  }
+
+  const handleRefreshAcceptedModal = async () => {
+    if (!acceptedModalEvent) return
+    await loadAcceptedParticipantsIntoModal(acceptedModalEvent.id)
+  }
+
+  const handleCloseAcceptedModal = () => {
+    setAcceptedModalVisible(false)
+    setAcceptedModalEvent(null)
+    setAcceptedModalParticipants([])
+    setAcceptedModalError(null)
+  }
+
+  const handleExportAcceptedParticipantsCsv = async (event: Event) => {
+    setAcceptedModalExporting(true)
+    try {
+      const participants =
+        acceptedModalEvent?.id === event.id && acceptedModalParticipants.length > 0
+          ? acceptedModalParticipants
+          : await fetchAcceptedParticipantsForEvent(event.id)
+
+      if (participants.length === 0) {
+        setNotification({ type: 'warning', message: 'No accepted participants to export for this event yet.' })
+        return
+      }
+
+      const rows = participants.map(({ application, profile }) =>
+        participantToCsvRow(profile, {
+          eventTitle: event.title,
+          eventId: event.id,
+          participantId: application.participant_id,
+          applicationStatus: application.status,
+          applicationDate: application.created_at,
+          motivationLetter: application.motivation_letter || ''
+        })
+      )
+
+      const safeTitle = event.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'event'
+      downloadCsvFile(`${safeTitle}-accepted-participants.csv`, PARTICIPANT_CSV_HEADERS, rows)
+      setNotification({ type: 'success', message: 'Accepted participants exported as CSV.' })
+    } catch (error) {
+      console.error('Error exporting accepted participants CSV:', error)
+      setNotification({ type: 'error', message: 'Failed to export accepted participants CSV.' })
+    } finally {
+      setAcceptedModalExporting(false)
+    }
+  }
+
   const calculateAge = (birthDate: string) => {
     const today = new Date()
     const birth = new Date(birthDate)
@@ -454,6 +612,33 @@ export default function OrganizationDashboard() {
                     >
                       <Eye className="h-5 w-5" />
                     </Link>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3 mb-6">
+                    <button
+                      onClick={() => handleOpenAcceptedModalForEvent(selectedEvent)}
+                      className="flex-1 inline-flex items-center justify-center gap-2 border border-blue-200 text-blue-700 font-semibold px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
+                    >
+                      <Users className="h-4 w-4" />
+                      List Accepted Participants
+                    </button>
+                    <button
+                      onClick={() => handleExportAcceptedParticipantsCsv(selectedEvent)}
+                      disabled={acceptedModalExporting}
+                      className="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {acceptedModalExporting ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                          Preparing CSV...
+                        </>
+                      ) : (
+                        <>
+                          <Download className="h-4 w-4" />
+                          Export Accepted as CSV
+                        </>
+                      )}
+                    </button>
                   </div>
 
                   {(() => {
@@ -778,6 +963,144 @@ export default function OrganizationDashboard() {
         </div>
       </div>
 
+      {acceptedModalVisible && acceptedModalEvent && (
+        <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0"
+            onClick={handleCloseAcceptedModal}
+          />
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-gray-200 ring-1 ring-black/5">
+            <div className="sticky top-0 bg-white/95 backdrop-blur-sm px-4 sm:px-6 py-3 border-b border-gray-200 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-900">
+                  Accepted Participants
+                </h3>
+                <p className="text-sm text-gray-500">
+                  {acceptedModalEvent.title}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleRefreshAcceptedModal}
+                  disabled={acceptedModalLoading}
+                  className="text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Refresh
+                </button>
+                <button
+                  onClick={handleCloseAcceptedModal}
+                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-2 transition-colors"
+                  aria-label="Close modal"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+            <div className="px-4 sm:px-6 py-3 border-b border-gray-200 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-gray-500">
+                {acceptedModalLoading
+                  ? 'Loading accepted participants...'
+                  : `${acceptedModalParticipants.length} participant${acceptedModalParticipants.length === 1 ? '' : 's'} accepted`}
+              </p>
+              <button
+                onClick={() => handleExportAcceptedParticipantsCsv(acceptedModalEvent)}
+                disabled={acceptedModalExporting}
+                className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {acceptedModalExporting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600" />
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4" />
+                    Export CSV
+                  </>
+                )}
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
+              {acceptedModalLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
+                </div>
+              ) : acceptedModalError ? (
+                <div className="text-center py-12">
+                  <p className="text-red-600 font-medium mb-2">{acceptedModalError}</p>
+                  <button
+                    onClick={handleRefreshAcceptedModal}
+                    className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                  >
+                    Try again
+                  </button>
+                </div>
+              ) : acceptedModalParticipants.length === 0 ? (
+                <div className="text-center py-12">
+                  <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-600">No accepted participants yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {acceptedModalParticipants.map(({ application, profile }) => (
+                    <div key={application.id} className="border border-gray-200 rounded-lg p-4 shadow-sm">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="text-lg font-semibold text-gray-900">
+                            {(profile?.first_name || 'First name') + ' ' + (profile?.last_name || 'Not provided')}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            {profile?.email || 'Email not provided'}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            Applied on {formatDate(application.created_at)}
+                          </p>
+                        </div>
+                        <span className="text-xs font-semibold bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                          Accepted
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4 text-sm text-gray-700">
+                        {profile?.location && (
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-blue-500" />
+                            <span>{profile.location}</span>
+                          </div>
+                        )}
+                        {profile?.nationality && (
+                          <div className="flex items-center gap-2">
+                            <Globe className="h-4 w-4 text-blue-500" />
+                            <span>{profile.nationality}</span>
+                          </div>
+                        )}
+                        {profile?.languages && Array.isArray(profile.languages) && profile.languages.length > 0 && (
+                          <div className="flex items-center gap-2 md:col-span-2">
+                            <Languages className="h-4 w-4 text-blue-500" />
+                            <span>
+                              {profile.languages
+                                .map((lang) => `${lang.language}${lang.level ? ` (${lang.level})` : ''}`)
+                                .join(', ')}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-4 bg-gray-50 rounded-lg p-3">
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">
+                          Motivation Letter
+                        </p>
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                          {application.motivation_letter || 'Not provided.'}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Participant Profile Modal */}
       {selectedParticipant && (
         <div className="fixed inset-0 bg-gray-100 bg-opacity-80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -791,16 +1114,35 @@ export default function OrganizationDashboard() {
                   {selectedParticipant.first_name || 'Unknown'} {selectedParticipant.last_name || 'User'}
                 </p>
               </div>
-              <button
-                onClick={() => {
-                  setSelectedParticipant(null)
-                  setParticipantProfile(null)
-                }}
-                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-2 transition-all"
-                aria-label="Close modal"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleDownloadParticipantCsv}
+                  disabled={downloadingParticipantCsv || !participantProfile}
+                  className="flex items-center gap-2 text-sm font-semibold text-blue-700 hover:text-blue-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {downloadingParticipantCsv ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-700" />
+                      Preparing CSV...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4" />
+                      Download CSV
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedParticipant(null)
+                    setParticipantProfile(null)
+                  }}
+                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-2 transition-all"
+                  aria-label="Close modal"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
 
             <div className="p-6 overflow-y-auto flex-1">

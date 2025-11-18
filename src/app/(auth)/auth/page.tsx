@@ -18,6 +18,7 @@ export default function AuthPage() {
     userType: 'participant' as 'participant' | 'organization',
     organizationName: '',
     birth_date: '',
+    location: '',
     // New participant fields
     gender: '' as 'female' | 'male' | 'undefined' | '',
     nationality: '',
@@ -155,16 +156,80 @@ export default function AuthPage() {
         return
       }
 
-      if (formData.userType === 'participant' && (!formData.firstName || !formData.lastName || !formData.birth_date)) {
-        setError('Please fill in all required fields: First Name, Last Name, and Birth Date')
-        setLoading(false)
-        return
+      if (formData.userType === 'participant') {
+        if (!formData.firstName.trim() || !formData.lastName.trim()) {
+          setError('Please provide both first name and last name.')
+          setLoading(false)
+          return
+        }
+        if (!formData.birth_date) {
+          setError('Birth date is required.')
+          setLoading(false)
+          return
+        }
+        if (!formData.location.trim()) {
+          setError('Location is required.')
+          setLoading(false)
+          return
+        }
+        if (!formData.gender) {
+          setError('Gender is required.')
+          setLoading(false)
+          return
+        }
+        if (!formData.nationality) {
+          setError('Nationality is required.')
+          setLoading(false)
+          return
+        }
+        if (!formData.residency_country) {
+          setError('Residency country is required.')
+          setLoading(false)
+          return
+        }
+        if (formData.citizenships.length === 0) {
+          setError('Please add at least one citizenship.')
+          setLoading(false)
+          return
+        }
+        if (!formData.role_in_project) {
+          setError('Role in project is required.')
+          setLoading(false)
+          return
+        }
+        if (formData.has_fewer_opportunities && formData.fewer_opportunities_categories.length === 0) {
+          setError('Select at least one fewer opportunities category.')
+          setLoading(false)
+          return
+        }
+        if (formData.languages.length === 0) {
+          setError('Please add at least one language.')
+          setLoading(false)
+          return
+        }
+        if (formData.languages.some(lang => !lang.language || !lang.level)) {
+          setError('Each language must include both the language name and level.')
+          setLoading(false)
+          return
+        }
+        if (formData.participant_target_groups.length === 0) {
+          setError('Select at least one target group.')
+          setLoading(false)
+          return
+        }
       }
 
-      if (formData.userType === 'organization' && !formData.organizationName) {
-        setError('Please enter your organization name')
-        setLoading(false)
-        return
+      if (formData.userType === 'organization') {
+        if (!formData.organizationName.trim()) {
+          setError('Please enter your organization name.')
+          setLoading(false)
+          return
+        }
+        if (!formData.location.trim()) {
+          setError('Organization location is required.')
+          setLoading(false)
+          return
+        }
       }
 
       const participantProfileDefaults =
@@ -173,7 +238,8 @@ export default function AuthPage() {
               first_name: formData.firstName.trim(),
               last_name: formData.lastName.trim(),
               email: formData.email,
-              birthdate: formData.birth_date || null,
+              birth_date: formData.birth_date || null,
+              location: formData.location.trim(),
               gender: formData.gender || null,
               nationality: formData.nationality.trim() || null,
               citizenships: formData.citizenships.length > 0 ? formData.citizenships : null,
@@ -200,6 +266,7 @@ export default function AuthPage() {
             ? {
                 organization_name: formData.organizationName?.trim() || '',
                 email: formData.email,
+                location: formData.location.trim(),
               }
             : null,
       }
@@ -243,7 +310,8 @@ export default function AuthPage() {
             first_name: formData.firstName.trim(),
             last_name: formData.lastName.trim(),
             email: formData.email,
-            birthdate: formData.birth_date || null,
+            birth_date: formData.birth_date || null,
+            location: formData.location.trim(),
             gender: formData.gender || null,
             nationality: formData.nationality.trim() || null,
             citizenships: formData.citizenships.length > 0 ? formData.citizenships : null,
@@ -268,6 +336,7 @@ export default function AuthPage() {
             user_type: 'organization',
             organization_name: formData.organizationName?.trim() || '',
             email: formData.email,
+            location: formData.location.trim(),
           }
 
           const { error: profileError } = await supabase
@@ -324,6 +393,7 @@ export default function AuthPage() {
       userType: 'participant',
       organizationName: '',
       birth_date: '',
+      location: '',
       gender: '',
       nationality: '',
       citizenships: [],
@@ -517,6 +587,22 @@ export default function AuthPage() {
                     className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   />
                 </div>
+                <div>
+                  <label htmlFor="location" className="block text-sm font-medium text-gray-700">
+                    <MapPin className="h-4 w-4 inline mr-1" />
+                    Location *
+                  </label>
+                  <input
+                    id="location"
+                    name="location"
+                    type="text"
+                    required
+                    value={formData.location}
+                    onChange={handleInputChange}
+                    className="mt1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    placeholder="City, Country"
+                  />
+                </div>
 
                 {/* Additional Participant Information Section */}
                 <div className="border-t pt-4 mt-4">
@@ -532,9 +618,10 @@ export default function AuthPage() {
                       name="gender"
                       value={formData.gender}
                       onChange={handleInputChange}
+                      required
                       className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     >
-                      <option value="">Select gender</option>
+                      <option value="" disabled>Select gender</option>
                       {genderOptions.map(option => (
                         <option key={option} value={option}>{option}</option>
                       ))}
@@ -553,9 +640,10 @@ export default function AuthPage() {
                         name="nationality"
                         value={formData.nationality}
                         onChange={handleInputChange}
+                        required
                         className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                       >
-                        <option value="">Select nationality</option>
+                        <option value="" disabled>Select nationality</option>
                         {countries.map(country => (
                           <option key={country} value={country}>{country}</option>
                         ))}
@@ -571,9 +659,10 @@ export default function AuthPage() {
                         name="residency_country"
                         value={formData.residency_country}
                         onChange={handleInputChange}
+                        required
                         className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                       >
-                        <option value="">Select country</option>
+                        <option value="" disabled>Select country</option>
                         {countries.map(country => (
                           <option key={country} value={country}>{country}</option>
                         ))}
@@ -621,6 +710,9 @@ export default function AuthPage() {
                         ))}
                       </div>
                     )}
+                    {formData.citizenships.length === 0 && (
+                      <p className="text-xs text-red-600 mt-1">Add at least one citizenship.</p>
+                    )}
                   </div>
 
                   {/* Role in Project */}
@@ -634,9 +726,10 @@ export default function AuthPage() {
                       name="role_in_project"
                       value={formData.role_in_project}
                       onChange={handleInputChange}
+                      required
                       className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     >
-                      <option value="">Select role</option>
+                      <option value="" disabled>Select role</option>
                       {roleOptions.map(role => (
                         <option key={role} value={role}>{role}</option>
                       ))}
@@ -692,6 +785,9 @@ export default function AuthPage() {
                           </div>
                         ))}
                       </div>
+                    )}
+                    {formData.languages.length === 0 && (
+                      <p className="text-xs text-red-600">Add at least one language.</p>
                     )}
                   </div>
 
@@ -751,26 +847,46 @@ export default function AuthPage() {
                       ))}
                     </div>
                   </div>
+                  {formData.participant_target_groups.length === 0 && (
+                    <p className="text-xs text-red-600">Select at least one target group.</p>
+                  )}
                 </div>
               </>
             )}
 
             {/* Organization name for organizations (registration only) */}
             {!isLogin && formData.userType === 'organization' && (
-              <div>
-                <label htmlFor="organizationName" className="block text-sm font-medium text-gray-700">
-                  Organization name
-                </label>
-                <input
-                  id="organizationName"
-                  name="organizationName"
-                  type="text"
-                  required
-                  value={formData.organizationName}
-                  onChange={handleInputChange}
-                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  placeholder="Your organization name"
-                />
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="organizationName" className="block text-sm font-medium text-gray-700">
+                    Organization name
+                  </label>
+                  <input
+                    id="organizationName"
+                    name="organizationName"
+                    type="text"
+                    required
+                    value={formData.organizationName}
+                    onChange={handleInputChange}
+                    className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    placeholder="Your organization name"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="organizationLocation" className="block text-sm font-medium text-gray-700">
+                    Organization location
+                  </label>
+                  <input
+                    id="organizationLocation"
+                    name="location"
+                    type="text"
+                    required
+                    value={formData.location}
+                    onChange={handleInputChange}
+                    className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    placeholder="City, Country"
+                  />
+                </div>
               </div>
             )}
 

@@ -5,8 +5,25 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { calculateAge } from '@/lib/utils'
-import { Calendar, Users, User, LogOut, Plus, Eye, Settings, TrendingUp, Clock, CheckCircle, XCircle, AlertCircle, Edit, Award, Flag, MapPin, Briefcase, Languages, Mail } from 'lucide-react'
+import { Calendar, Users, User, LogOut, Plus, Eye, Settings, TrendingUp, Clock, CheckCircle, XCircle, AlertCircle, Edit, Award, Flag, MapPin, Briefcase, Languages, Mail, FileText } from 'lucide-react'
 import { countries } from '@/lib/countries'
+
+const PARTICIPANT_COMPLETION_FIELDS = [
+  'first_name',
+  'last_name',
+  'birth_date',
+  'location',
+  'gender',
+  'nationality',
+  'citizenships',
+  'residency_country',
+  'role_in_project',
+  'languages',
+  'participant_target_groups',
+  'bio'
+] as const
+
+const ORGANIZATION_COMPLETION_FIELDS = ['organization_name', 'location', 'bio'] as const
 
 interface User {
   id: string
@@ -157,16 +174,23 @@ export default function DashboardPage() {
               const organizationDefaults = userMeta.organization_profile_defaults || {}
               const profileType = (userMeta.user_type || 'participant') as 'participant' | 'organization'
 
+              const birthDateValue =
+                participantDefaults.birth_date ??
+                participantDefaults.birthdate ??
+                userMeta.birth_date ??
+                new Date(Date.now() - 18 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+
               const baseProfile: any = {
                 id: session.user.id,
                 user_type: profileType,
                 first_name: participantDefaults.first_name ?? userMeta.first_name ?? '',
                 last_name: participantDefaults.last_name ?? userMeta.last_name ?? '',
                 email: participantDefaults.email ?? session.user.email ?? userMeta.email ?? '',
-                birthdate:
-                  participantDefaults.birthdate ??
-                  userMeta.birth_date ??
-                  new Date(Date.now() - 18 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                location:
+                  profileType === 'participant'
+                    ? participantDefaults.location ?? userMeta.location ?? ''
+                    : organizationDefaults.location ?? userMeta.location ?? '',
+                birth_date: birthDateValue,
               }
 
               if (profileType === 'participant') {
@@ -183,9 +207,8 @@ export default function DashboardPage() {
               } else {
                 baseProfile.organization_name =
                   organizationDefaults.organization_name ?? userMeta.organization_name ?? 'Organization'
-                baseProfile.bio = organizationDefaults.bio ?? null
-                baseProfile.location = organizationDefaults.location ?? null
-                baseProfile.website = organizationDefaults.website ?? null
+                baseProfile.bio = organizationDefaults.bio ?? ''
+                baseProfile.website = organizationDefaults.website ?? ''
               }
               
               const { error: insertError } = await supabase
@@ -205,7 +228,7 @@ export default function DashboardPage() {
                 first_name: profileData.first_name || '',
                 last_name: profileData.last_name || '',
                 email: profileData.email || session.user.email || '',
-                birth_date: profileData.birthdate || prev.birth_date,
+                birth_date: profileData.birth_date || profileData.birthdate || prev.birth_date,
                 nationality: profileData.nationality || prev.nationality,
                 residency_country: profileData.residency_country || prev.residency_country,
                 role_in_project: profileData.role_in_project || prev.role_in_project,
@@ -376,7 +399,7 @@ export default function DashboardPage() {
         last_name: profileForm.last_name,
         bio: profileForm.bio,
         location: profileForm.location,
-        birthdate: profileForm.birth_date || null,
+        birth_date: profileForm.birth_date || null,
         website: websiteValue
       }
 
@@ -545,6 +568,53 @@ export default function DashboardPage() {
     )
   }
 
+  const profileCompletion = (() => {
+    const fields =
+      profile.user_type === 'participant'
+        ? PARTICIPANT_COMPLETION_FIELDS
+        : ORGANIZATION_COMPLETION_FIELDS
+
+    const fieldFilled = (field: string) => {
+      const value = (profile as any)[field]
+      if (Array.isArray(value)) return value.length > 0
+      if (value === null || value === undefined) return false
+      return value.toString().trim().length > 0
+    }
+
+    const filled = fields.filter(fieldFilled)
+    const percent =
+      fields.length === 0 ? 100 : Math.round((filled.length / fields.length) * 100)
+    const missing = fields.filter(field => !fieldFilled(field))
+    return { percent, missing }
+  })()
+
+  const renderProfileField = (
+    label: string,
+    value?: string | string[] | null,
+    icon?: React.ReactNode
+  ) => {
+    if (!value || (Array.isArray(value) && value.length === 0)) return null
+    return (
+      <div className="flex items-start gap-3">
+        {icon && <div className="mt-1 text-gray-400">{icon}</div>}
+        <div>
+          <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
+          {Array.isArray(value) ? (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {value.map((item, idx) => (
+                <span key={`${label}-${idx}`} className="bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs">
+                  {item}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-900 mt-1">{value}</p>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   const getDisplayName = () => {
     if (profile.user_type === 'organization') {
       return profile.organization_name || 'Organization'
@@ -681,7 +751,24 @@ export default function DashboardPage() {
         {/* Profile Editing Section */}
         <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-gray-900">Profile Information</h2>
+            <div>
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl font-semibold text-gray-900">Profile Information</h2>
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                    profileCompletion.percent === 100 ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'
+                  }`}
+                >
+                  {profileCompletion.percent === 100 && <CheckCircle className="h-3 w-3" />}
+                  {profileCompletion.percent}% complete
+                </span>
+              </div>
+              {profileCompletion.percent < 100 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Missing: {profileCompletion.missing.join(', ')}
+                </p>
+              )}
+            </div>
             <button
               onClick={isEditingProfile ? () => setIsEditingProfile(false) : handleEditProfileClick}
               className="flex items-center text-blue-600 hover:text-blue-700 px-3 py-2 rounded-md hover:bg-blue-50"
@@ -1059,152 +1146,61 @@ export default function DashboardPage() {
             </form>
           ) : (
             <div className="space-y-6">
-              {/* Basic Information */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Basic Information</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <h4 className="text-xs font-medium text-gray-500 mb-1">First Name</h4>
-                    <p className="text-gray-900">{profile?.first_name || 'Not specified'}</p>
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-medium text-gray-500 mb-1">Last Name (Family Name)</h4>
-                    <p className="text-gray-900">{profile?.last_name || 'Not specified'}</p>
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-medium text-gray-500 mb-1">Email</h4>
-                    <p className="text-gray-900">{profile?.email || user?.email || 'Not specified'}</p>
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-medium text-gray-500 mb-1">Age</h4>
-                    <p className="text-gray-900">
-                      {profile?.birth_date ? calculateAge(profile.birth_date) + ' years old' : 'Not specified'}
-                    </p>
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-medium text-gray-500 mb-1">Gender</h4>
-                    <p className="text-gray-900">{profile?.gender || 'Not specified'}</p>
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-medium text-gray-500 mb-1">Location</h4>
-                    <p className="text-gray-900">{profile?.location || 'Not specified'}</p>
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-medium text-gray-500 mb-1">Website</h4>
-                    <p className="text-gray-900">
-                      {profile?.website ? (
-                        <a href={profile.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                          {profile.website}
-                        </a>
-                      ) : 'Not specified'}
-                    </p>
-                  </div>
-                </div>
-                {profile?.bio && (
-                  <div className="mt-4">
-                    <h4 className="text-xs font-medium text-gray-500 mb-1">Bio</h4>
-                    <p className="text-gray-900">{profile.bio}</p>
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {renderProfileField(
+                  'Full Name',
+                  `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
+                  <User className="h-4 w-4" />
                 )}
+                {renderProfileField(
+                  'Email',
+                  profile.email || user.email,
+                  <Mail className="h-4 w-4" />
+                )}
+                {renderProfileField(
+                  'Birth Date',
+                  profile.birth_date
+                    ? `${profile.birth_date} (${calculateAge(profile.birth_date)} years old)`
+                    : null,
+                  <Calendar className="h-4 w-4" />
+                )}
+                {renderProfileField('Gender', profile.gender, <User className="h-4 w-4" />)}
+                {renderProfileField('Location', profile.location, <MapPin className="h-4 w-4" />)}
+                {renderProfileField('Website', profile.website, <Award className="h-4 w-4" />)}
+                {renderProfileField('Bio', profile.bio, <FileText className="h-4 w-4" />)}
               </div>
 
-              {/* Participant-specific fields */}
-              {profile?.user_type === 'participant' && (
-                <>
-                  {/* Nationality & Citizenship */}
-                  {(profile?.nationality || profile?.citizenships || profile?.residency_country) && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-700 mb-3">Nationality & Location</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {profile?.nationality && (
-                          <div>
-                            <h4 className="text-xs font-medium text-gray-500 mb-1">Nationality</h4>
-                            <p className="text-gray-900">{profile.nationality}</p>
-                          </div>
-                        )}
-                        {profile?.residency_country && (
-                          <div>
-                            <h4 className="text-xs font-medium text-gray-500 mb-1">Residency Country</h4>
-                            <p className="text-gray-900">{profile.residency_country}</p>
-                          </div>
-                        )}
-                        {profile?.citizenships && Array.isArray(profile.citizenships) && profile.citizenships.length > 0 && (
-                          <div className="md:col-span-2">
-                            <h4 className="text-xs font-medium text-gray-500 mb-1">Citizenships</h4>
-                            <div className="flex flex-wrap gap-2">
-                              {profile.citizenships.map((citizenship: string, idx: number) => (
-                                <span key={idx} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
-                                  {citizenship}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+              {profile.user_type === 'participant' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {renderProfileField('Nationality', profile.nationality, <Flag className="h-4 w-4" />)}
+                  {renderProfileField('Residency Country', profile.residency_country, <MapPin className="h-4 w-4" />)}
+                  {renderProfileField(
+                    'Citizenships',
+                    Array.isArray(profile.citizenships) ? profile.citizenships : [],
+                    <Flag className="h-4 w-4" />
                   )}
-
-                  {/* Role & Languages */}
-                  {(profile?.role_in_project || (profile?.languages && Array.isArray(profile.languages) && profile.languages.length > 0)) && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-700 mb-3">Role & Languages</h3>
-                      <div className="space-y-4">
-                        {profile?.role_in_project && (
-                          <div>
-                            <h4 className="text-xs font-medium text-gray-500 mb-1">Role in Project</h4>
-                            <p className="text-gray-900">{profile.role_in_project}</p>
-                          </div>
-                        )}
-                        {profile?.languages && Array.isArray(profile.languages) && profile.languages.length > 0 && (
-                          <div>
-                            <h4 className="text-xs font-medium text-gray-500 mb-1">Languages</h4>
-                            <div className="flex flex-wrap gap-2">
-                              {profile.languages.map((lang: any, idx: number) => (
-                                <span key={idx} className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
-                                  {lang.language} - {lang.level}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                  {renderProfileField('Role in Project', profile.role_in_project, <Briefcase className="h-4 w-4" />)}
+                  {renderProfileField(
+                    'Languages',
+                    Array.isArray(profile.languages)
+                      ? profile.languages.map((lang: any) => `${lang.language} - ${lang.level}`)
+                      : [],
+                    <Languages className="h-4 w-4" />
                   )}
-
-                  {/* Target Groups */}
-                  {profile?.participant_target_groups && Array.isArray(profile.participant_target_groups) && profile.participant_target_groups.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-700 mb-3">Target Groups</h3>
-                      <div className="flex flex-wrap gap-2">
-                        {profile.participant_target_groups.map((group: string, idx: number) => (
-                          <span key={idx} className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs">
-                            {group}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
+                  {renderProfileField(
+                    'Target Groups',
+                    Array.isArray(profile.participant_target_groups) ? profile.participant_target_groups : [],
+                    <Users className="h-4 w-4" />
                   )}
-
-                  {/* Fewer Opportunities */}
-                  {profile?.has_fewer_opportunities && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-700 mb-3">Fewer Opportunities</h3>
-                      <p className="text-sm text-gray-600 mb-2">Participant with fewer opportunities: Yes</p>
-                      {profile?.fewer_opportunities_categories && Array.isArray(profile.fewer_opportunities_categories) && profile.fewer_opportunities_categories.length > 0 && (
-                        <div>
-                          <h4 className="text-xs font-medium text-gray-500 mb-1">Categories</h4>
-                          <div className="flex flex-wrap gap-2">
-                            {profile.fewer_opportunities_categories.map((category: string, idx: number) => (
-                              <span key={idx} className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs">
-                                {category}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </>
+                  {profile.has_fewer_opportunities &&
+                    renderProfileField(
+                      'Fewer Opportunities Categories',
+                      Array.isArray(profile.fewer_opportunities_categories)
+                        ? profile.fewer_opportunities_categories
+                        : [],
+                      <AlertCircle className="h-4 w-4" />
+                    )}
+                </div>
               )}
             </div>
           )}

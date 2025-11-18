@@ -21,10 +21,12 @@ import {
   UtensilsCrossed,
   Car,
   Building2,
-  Tag
+  Tag,
+  Download
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/lib/utils'
+import { downloadCsvFile, participantToCsvRow, PARTICIPANT_CSV_HEADERS, ParticipantProfileForCsv } from '@/lib/csv'
 
 interface Event {
   id: string
@@ -59,9 +61,17 @@ interface Event {
 
 interface Application {
   id: string
+  participant_id: string
   status: 'pending' | 'accepted' | 'rejected'
   motivation_letter: string
   created_at: string
+}
+
+type ParticipantProfile = ParticipantProfileForCsv
+
+interface AcceptedParticipant {
+  application: Application
+  profile: ParticipantProfile | null
 }
 
 export default function EventDetailsPage() {
@@ -77,6 +87,12 @@ export default function EventDetailsPage() {
   const [applying, setApplying] = useState(false)
   const [timeoutId, setTimeoutId] = useState<NodeJS.Timeout | null>(null)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
+  const [acceptedParticipants, setAcceptedParticipants] = useState<AcceptedParticipant[]>([])
+  const [participantsLoading, setParticipantsLoading] = useState(false)
+  const [participantsError, setParticipantsError] = useState<string | null>(null)
+  const [participantsLoaded, setParticipantsLoaded] = useState(false)
+  const [showAcceptedModal, setShowAcceptedModal] = useState(false)
+  const [exportingParticipants, setExportingParticipants] = useState(false)
 
   useEffect(() => {
     fetchEvent()
@@ -248,6 +264,13 @@ export default function EventDetailsPage() {
     )
   }
 
+  const canManageEvent = Boolean(
+    user &&
+    userProfile?.user_type === 'organization' &&
+    event.organization_id &&
+    user.id === event.organization_id
+  )
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'accepted':
@@ -271,6 +294,129 @@ export default function EventDetailsPage() {
         return 'bg-yellow-100 text-yellow-800'
       default:
         return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const fetchAcceptedParticipants = async (): Promise<AcceptedParticipant[] | null> => {
+    setParticipantsLoading(true)
+    setParticipantsError(null)
+    setParticipantsLoaded(false)
+
+    try {
+      const { data: applicationsData, error } = await supabase
+        .from('applications')
+        .select('id, participant_id, motivation_letter, created_at, status')
+        .eq('event_id', params.id)
+        .eq('status', 'accepted')
+
+      if (error) throw error
+
+      if (!applicationsData || applicationsData.length === 0) {
+        setAcceptedParticipants([])
+        setParticipantsLoaded(true)
+        return []
+      }
+
+      const participantIds = applicationsData
+        .map((app) => app.participant_id)
+        .filter((id): id is string => Boolean(id))
+
+      let profilesMap = new Map<string, ParticipantProfile>()
+
+      if (participantIds.length > 0) {
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select(
+            'id, first_name, last_name, email, location, gender, birth_date, nationality, residency_country, citizenships, languages, participant_target_groups, has_fewer_opportunities, fewer_opportunities_categories, role_in_project, bio, website'
+          )
+          .in('id', participantIds)
+
+        if (profilesError) throw profilesError
+
+        profilesMap = new Map((profilesData || []).map((profile) => [profile.id, profile]))
+      }
+
+      const combined = applicationsData.map((app) => ({
+        application: app as Application,
+        profile: profilesMap.get(app.participant_id) || null
+      }))
+
+      setAcceptedParticipants(combined)
+      setParticipantsLoaded(true)
+      return combined
+    } catch (error) {
+      console.error('Error fetching accepted participants:', error)
+      setParticipantsError('Failed to load accepted participants.')
+      return null
+    } finally {
+      setParticipantsLoading(false)
+    }
+  }
+
+  const handleOpenAcceptedModal = async () => {
+    if (!canManageEvent) {
+      setToast({ message: 'Only the organizing account can view accepted participants.', type: 'error' })
+      return
+    }
+    setParticipantsError(null)
+    setShowAcceptedModal(true)
+    if (!participantsLoaded && !participantsLoading) {
+      await fetchAcceptedParticipants()
+    }
+  }
+
+  const handleCloseAcceptedModal = () => {
+    setShowAcceptedModal(false)
+  }
+
+  const handleExportParticipantsCsv = async () => {
+    if (!event) return
+    if (!canManageEvent) {
+      setToast({ message: 'Only the organizing account can export participant data.', type: 'error' })
+      return
+    }
+    setExportingParticipants(true)
+
+    try {
+      let data = acceptedParticipants
+      if (!participantsLoaded) {
+        const fetched = await fetchAcceptedParticipants()
+        if (fetched === null) {
+          setToast({ message: 'Failed to export CSV. Please try again.', type: 'error' })
+          return
+        }
+        data = fetched
+      }
+
+      if (!data || data.length === 0) {
+        setToast({ message: 'No accepted participants to export yet.', type: 'info' })
+        return
+      }
+
+      const rows = data.map(({ application, profile }) =>
+        participantToCsvRow(profile, {
+          eventTitle: event.title,
+          eventId: event.id,
+          participantId: application.participant_id,
+          applicationStatus: application.status,
+          applicationDate: application.created_at,
+          motivationLetter: application.motivation_letter,
+          email: profile?.email
+        })
+      )
+
+      const safeTitle = event.title?.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'event'
+      downloadCsvFile(
+        `${safeTitle}-accepted-participants.csv`,
+        PARTICIPANT_CSV_HEADERS,
+        rows
+      )
+      setToast({ message: 'Participant CSV exported.', type: 'success' })
+    } catch (error) {
+      console.error('Error exporting participant CSV:', error)
+      setToast({ message: 'Failed to export CSV. Please try again.', type: 'error' })
+    } finally {
+      setExportingParticipants(false)
     }
   }
 
@@ -332,6 +478,35 @@ export default function EventDetailsPage() {
                     </div>
                   </div>
                 </div>
+
+                {canManageEvent && (
+                  <div className="flex flex-wrap gap-3 mb-6">
+                    <button
+                      onClick={handleOpenAcceptedModal}
+                      className="inline-flex items-center gap-2 border border-blue-200 text-blue-700 font-semibold px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
+                    >
+                      <Users className="h-4 w-4" />
+                      List Accepted Participants
+                    </button>
+                    <button
+                      onClick={handleExportParticipantsCsv}
+                      disabled={exportingParticipants}
+                      className="inline-flex items-center gap-2 bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {exportingParticipants ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                          Preparing CSV...
+                        </>
+                      ) : (
+                        <>
+                          <Download className="h-4 w-4" />
+                          Export Accepted as CSV
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
 
                 {/* Event Details - Restructured */}
                 <div className="space-y-4 mb-6">
@@ -585,18 +760,33 @@ export default function EventDetailsPage() {
                     </Link>
                   </div>
                 ) : userProfile?.user_type === 'organization' ? (
-                  <div className="text-center">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Organization View</h3>
-                    <p className="text-gray-600 mb-4">
-                      As an organization, you can view and manage your events from your dashboard.
-                    </p>
-                    <Link 
-                      href="/dashboard/organization" 
-                      className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors text-center block"
-                    >
-                      Go to Dashboard
-                    </Link>
-                  </div>
+                  canManageEvent ? (
+                    <div className="text-center">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3">Organization View</h3>
+                      <p className="text-gray-600 mb-4">
+                        Use the management buttons near the event title to list and export accepted participants.
+                      </p>
+                      <Link 
+                        href="/dashboard/organization" 
+                        className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors text-center block"
+                      >
+                        Go to Dashboard
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="text-center">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3">Organization View</h3>
+                      <p className="text-gray-600 mb-4">
+                        You&apos;re viewing an event managed by {event.organization_name}. Only that organization can view accepted participants.
+                      </p>
+                      <Link 
+                        href="/dashboard/organization" 
+                        className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors text-center block"
+                      >
+                        Go to Dashboard
+                      </Link>
+                    </div>
+                  )
                 ) : application ? (
                   <div className="text-center">
                     <h3 className="text-lg font-semibold text-gray-900 mb-3">Application Status</h3>
@@ -710,6 +900,142 @@ export default function EventDetailsPage() {
           </div>
         </div>
       </div>
+
+      {showAcceptedModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center px-4 py-6">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={handleCloseAcceptedModal}
+          />
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-gray-200 ring-1 ring-black/5">
+            <div className="sticky top-0 bg-white/95 backdrop-blur-sm px-4 sm:px-6 py-3 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-900">Accepted Participants</h3>
+                <p className="text-sm text-gray-500">
+                  {participantsLoading
+                    ? 'Loading accepted participants...'
+                    : `${acceptedParticipants.length} participant${acceptedParticipants.length === 1 ? '' : 's'} accepted`}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={fetchAcceptedParticipants}
+                  disabled={participantsLoading}
+                  className="text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Refresh
+                </button>
+                <button
+                  onClick={handleCloseAcceptedModal}
+                  className="text-gray-500 hover:text-gray-700"
+                  aria-label="Close modal"
+                >
+                  <XCircle className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
+              {participantsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
+                </div>
+              ) : participantsError ? (
+                <div className="text-center py-12">
+                  <p className="text-red-600 font-medium mb-2">{participantsError}</p>
+                  <button
+                    onClick={fetchAcceptedParticipants}
+                    className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                  >
+                    Try again
+                  </button>
+                </div>
+              ) : acceptedParticipants.length === 0 ? (
+                <div className="text-center py-12">
+                  <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-600">No accepted participants yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {acceptedParticipants.map(({ application, profile }) => (
+                    <div key={application.id} className="border border-gray-200 rounded-lg p-4 shadow-sm">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="text-lg font-semibold text-gray-900">
+                            {(profile?.first_name || 'First name') + ' ' + (profile?.last_name || 'not provided')}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            {profile?.email || 'Email not provided'}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            Applied on {formatDate(application.created_at)}
+                          </p>
+                        </div>
+                        <span className="text-xs font-semibold bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                          Accepted
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4 text-sm text-gray-700">
+                        {profile?.location && (
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-blue-500" />
+                            <span>{profile.location}</span>
+                          </div>
+                        )}
+                        {profile?.nationality && (
+                          <div className="flex items-center gap-2">
+                            <Globe className="h-4 w-4 text-blue-500" />
+                            <span>{profile.nationality}</span>
+                          </div>
+                        )}
+                        {profile?.languages && Array.isArray(profile.languages) && profile.languages.length > 0 && (
+                          <div className="flex items-center gap-2 md:col-span-2">
+                            <Languages className="h-4 w-4 text-blue-500" />
+                            <span>
+                              {profile.languages
+                                .map((lang) => `${lang.language}${lang.level ? ` (${lang.level})` : ''}`)
+                                .join(', ')}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-4 bg-gray-50 rounded-lg p-3">
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">
+                          Motivation Letter
+                        </p>
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                          {application.motivation_letter || 'Not provided.'}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+              <p className="text-sm text-gray-500">
+                Need a copy? Use the dashboard actions or export directly.
+              </p>
+              <button
+                onClick={handleExportParticipantsCsv}
+                disabled={exportingParticipants}
+                className="flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-800 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {exportingParticipants ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600" />
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4" />
+                    Export CSV
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

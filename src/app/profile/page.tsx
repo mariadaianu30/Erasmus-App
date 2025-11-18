@@ -97,6 +97,117 @@ export default function ProfilePage() {
   ]
   const languageLevels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'Native']
 
+  const createProfileFromMetadata = async (userId: string) => {
+    try {
+      const { data: userData } = await supabase.auth.getUser()
+      const userMeta = userData?.user?.user_metadata || {}
+      const participantDefaults = userMeta.participant_profile_defaults || {}
+      const organizationDefaults = userMeta.organization_profile_defaults || {}
+      const profileType = (userMeta.user_type || 'participant') as 'participant' | 'organization'
+
+      const birthDateValue =
+        participantDefaults.birth_date ??
+        participantDefaults.birthdate ??
+        userMeta.birth_date ??
+        new Date(Date.now() - 18 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+
+      const baseProfile: any = {
+        id: userId,
+        user_type: profileType,
+        first_name: participantDefaults.first_name ?? userMeta.first_name ?? '',
+        last_name: participantDefaults.last_name ?? userMeta.last_name ?? '',
+        email: participantDefaults.email ?? userMeta.email ?? '',
+        location:
+          profileType === 'participant'
+            ? participantDefaults.location ?? userMeta.location ?? ''
+            : organizationDefaults.location ?? userMeta.location ?? '',
+        birth_date: birthDateValue,
+      }
+
+      if (profileType === 'participant') {
+        baseProfile.gender = participantDefaults.gender ?? null
+        baseProfile.nationality = participantDefaults.nationality ?? null
+        baseProfile.citizenships = participantDefaults.citizenships ?? null
+        baseProfile.residency_country = participantDefaults.residency_country ?? null
+        baseProfile.role_in_project = participantDefaults.role_in_project ?? null
+        baseProfile.has_fewer_opportunities = participantDefaults.has_fewer_opportunities ?? false
+        baseProfile.fewer_opportunities_categories =
+          participantDefaults.fewer_opportunities_categories ?? []
+        baseProfile.languages = participantDefaults.languages ?? []
+        baseProfile.participant_target_groups = participantDefaults.participant_target_groups ?? []
+      } else {
+        baseProfile.organization_name =
+          organizationDefaults.organization_name ?? userMeta.organization_name ?? 'Organization'
+        baseProfile.bio = organizationDefaults.bio ?? ''
+        baseProfile.website = organizationDefaults.website ?? ''
+      }
+
+      const { error } = await supabase.from('profiles').upsert(baseProfile)
+      if (error) {
+        console.error('Failed to create profile from metadata:', error)
+        return null
+      }
+
+      return baseProfile
+    } catch (err) {
+      console.error('Error building profile from metadata:', err)
+      return null
+    }
+  }
+
+  const populateFormFromProfile = (data: any) => {
+    const languages = Array.isArray(data.languages) ? data.languages : []
+    const citizenships = Array.isArray(data.citizenships) ? data.citizenships : []
+    const fewerOpps = Array.isArray(data.fewer_opportunities_categories)
+      ? data.fewer_opportunities_categories
+      : []
+    const targetGroups = Array.isArray(data.participant_target_groups)
+      ? data.participant_target_groups
+      : []
+
+    if (data.user_type === 'organization') {
+      setFormData({
+        first_name: '',
+        last_name: '',
+        organization_name: data.organization_name || '',
+        bio: data.bio || '',
+        location: data.location || '',
+        birth_date: '',
+        website: data.website || '',
+        email: '',
+        gender: '',
+        nationality: '',
+        citizenships: [],
+        residency_country: '',
+        role_in_project: '',
+        has_fewer_opportunities: false,
+        fewer_opportunities_categories: [],
+        languages: [],
+        participant_target_groups: []
+      })
+    } else {
+      setFormData({
+        first_name: data.first_name || '',
+        last_name: data.last_name || '',
+        organization_name: '',
+        bio: data.bio || '',
+        location: data.location || '',
+        birth_date: data.birth_date || data.birthdate || '',
+        website: data.website || '',
+        email: data.email || '',
+        gender: data.gender || '',
+        nationality: data.nationality || '',
+        citizenships: citizenships,
+        residency_country: data.residency_country || '',
+        role_in_project: data.role_in_project || '',
+        has_fewer_opportunities: data.has_fewer_opportunities || false,
+        fewer_opportunities_categories: fewerOpps,
+        languages: languages,
+        participant_target_groups: targetGroups
+      })
+    }
+  }
+
   useEffect(() => {
     const getSession = async () => {
       try {
@@ -129,6 +240,7 @@ export default function ProfilePage() {
 
   const fetchProfile = async (userId: string) => {
     try {
+      let profileRecord: any = null
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -136,72 +248,65 @@ export default function ProfilePage() {
         .single()
 
       if (error) {
-        setError(`Failed to load profile: ${error.message}`)
-        setLoading(false)
-        return
+        const notFound =
+          error.code === 'PGRST116' ||
+          error.message?.toLowerCase().includes('no rows') ||
+          error.details?.toLowerCase().includes('no rows') ||
+          error.code === '406'
+
+        if (notFound) {
+          profileRecord = await createProfileFromMetadata(userId)
+          if (!profileRecord) {
+            setError('Profile not found. Please contact support.')
+            setLoading(false)
+            return
+          }
+        } else {
+          setError(`Failed to load profile: ${error.message}`)
+          setLoading(false)
+          return
+        }
+      } else {
+        profileRecord = data
       }
 
-      if (!data) {
+      if (!profileRecord) {
         setError('Profile not found. Please contact support.')
         setLoading(false)
         return
       }
 
-      setProfile(data)
+      setProfile(profileRecord)
+      populateFormFromProfile(profileRecord)
       setLoading(false)
-      
-      // Parse JSONB fields
-      const languages = Array.isArray(data.languages) ? data.languages : []
-      const citizenships = Array.isArray(data.citizenships) ? data.citizenships : []
-      const fewerOpps = Array.isArray(data.fewer_opportunities_categories) ? data.fewer_opportunities_categories : []
-      const targetGroups = Array.isArray(data.participant_target_groups) ? data.participant_target_groups : []
-      
-      // Set form data based on user type
-      if (data.user_type === 'organization') {
-        setFormData({
-          first_name: '',
-          last_name: '',
-          organization_name: data.organization_name || '',
-          bio: data.bio || '',
-          location: data.location || '',
-          birth_date: '',
-          website: data.website || '',
-          email: '',
-          gender: '',
-          nationality: '',
-          citizenships: [],
-          residency_country: '',
-          role_in_project: '',
-          has_fewer_opportunities: false,
-          fewer_opportunities_categories: [],
-          languages: [],
-          participant_target_groups: []
-        })
-      } else {
-        setFormData({
-          first_name: data.first_name || '',
-          last_name: data.last_name || '',
-          organization_name: '',
-          bio: data.bio || '',
-          location: data.location || '',
-          birth_date: data.birth_date || '',
-          website: data.website || '',
-          email: data.email || '',
-          gender: data.gender || '',
-          nationality: data.nationality || '',
-          citizenships: citizenships,
-          residency_country: data.residency_country || '',
-          role_in_project: data.role_in_project || '',
-          has_fewer_opportunities: data.has_fewer_opportunities || false,
-          fewer_opportunities_categories: fewerOpps,
-          languages: languages,
-          participant_target_groups: targetGroups
-        })
-      }
     } catch (error: any) {
       setError(`Failed to load profile: ${error?.message || 'Unknown error'}`)
       setLoading(false)
     }
+  }
+
+  const validateParticipantForm = () => {
+    if (!formData.first_name.trim()) return 'First name is required.'
+    if (!formData.last_name.trim()) return 'Last name is required.'
+    if (!formData.birth_date) return 'Birth date is required.'
+    if (!formData.location.trim()) return 'Location is required.'
+    if (!formData.gender) return 'Gender is required.'
+    if (!formData.nationality) return 'Nationality is required.'
+    if (!formData.residency_country) return 'Residency country is required.'
+    if (formData.citizenships.length === 0) return 'Please add at least one citizenship.'
+    if (!formData.role_in_project) return 'Role in project is required.'
+    if (formData.has_fewer_opportunities && formData.fewer_opportunities_categories.length === 0) {
+      return 'Select at least one fewer opportunities category.'
+    }
+    if (formData.languages.length === 0) return 'Please add at least one language.'
+    if (formData.participant_target_groups.length === 0) return 'Select at least one target group.'
+    return null
+  }
+
+  const validateOrganizationForm = () => {
+    if (!formData.organization_name.trim()) return 'Organization name is required.'
+    if (!formData.location.trim()) return 'Location is required.'
+    return null
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -219,6 +324,16 @@ export default function ProfilePage() {
     try {
       if (!user || !profile) {
         throw new Error('User or profile not found')
+      }
+
+      const validationError =
+        profile.user_type === 'participant' ? validateParticipantForm() : validateOrganizationForm()
+
+      if (validationError) {
+        setError(validationError)
+        clearTimeout(timeoutId)
+        setSaving(false)
+        return
       }
 
       const updateData: any = {
@@ -519,6 +634,7 @@ export default function ProfilePage() {
                       onChange={handleInputChange}
                       max={new Date().toISOString().split('T')[0]}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
                     />
                     {formData.birth_date && (
                       <p className="text-sm text-gray-500 mt-1">
@@ -529,7 +645,7 @@ export default function ProfilePage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       <MapPin className="h-4 w-4 inline mr-2" />
-                      Location
+                      Location *
                     </label>
                     <input
                       type="text"
@@ -538,6 +654,7 @@ export default function ProfilePage() {
                       onChange={handleInputChange}
                       placeholder="e.g., Munich, Germany"
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
                     />
                   </div>
                 </div>
@@ -545,15 +662,16 @@ export default function ProfilePage() {
                 {/* Gender */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Gender
+                    Gender *
                   </label>
                   <select
                     name="gender"
                     value={formData.gender}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
                   >
-                    <option value="">Select gender</option>
+                    <option value="" disabled>Select gender</option>
                     {genderOptions.map(option => (
                       <option key={option} value={option}>{option}</option>
                     ))}
@@ -565,15 +683,16 @@ export default function ProfilePage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       <Flag className="h-4 w-4 inline mr-2" />
-                      Nationality
+                      Nationality *
                     </label>
                     <select
                       name="nationality"
                       value={formData.nationality}
                       onChange={handleInputChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
                     >
-                      <option value="">Select nationality</option>
+                      <option value="" disabled>Select nationality</option>
                       {countries.map(country => (
                         <option key={country} value={country}>{country}</option>
                       ))}
@@ -582,15 +701,16 @@ export default function ProfilePage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       <MapPin className="h-4 w-4 inline mr-2" />
-                      Residency Country
+                      Residency Country *
                     </label>
                     <select
                       name="residency_country"
                       value={formData.residency_country}
                       onChange={handleInputChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
                     >
-                      <option value="">Select country</option>
+                      <option value="" disabled>Select country</option>
                       {countries.map(country => (
                         <option key={country} value={country}>{country}</option>
                       ))}
@@ -601,7 +721,7 @@ export default function ProfilePage() {
                 {/* Citizenships */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Citizenships
+                    Citizenships *
                   </label>
                   <div className="flex gap-2 mb-2">
                     <select
@@ -638,21 +758,25 @@ export default function ProfilePage() {
                       ))}
                     </div>
                   )}
+                  {formData.citizenships.length === 0 && (
+                    <p className="text-xs text-red-600 mt-1">Please add at least one citizenship.</p>
+                  )}
                 </div>
 
                 {/* Role in Project */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <Briefcase className="h-4 w-4 inline mr-2" />
-                    Role in Project
+                    Role in Project *
                   </label>
                   <select
                     name="role_in_project"
                     value={formData.role_in_project}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
                   >
-                    <option value="">Select role</option>
+                    <option value="" disabled>Select role</option>
                     {roleOptions.map(role => (
                       <option key={role} value={role}>{role}</option>
                     ))}
@@ -699,7 +823,7 @@ export default function ProfilePage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <Languages className="h-4 w-4 inline mr-2" />
-                    Languages
+                    Languages *
                   </label>
                   <div className="flex gap-2 mb-2">
                     <input
@@ -746,11 +870,14 @@ export default function ProfilePage() {
                     </div>
                   )}
                 </div>
+                {formData.languages.length === 0 && (
+                  <p className="text-xs text-red-600">Add at least one language.</p>
+                )}
 
                 {/* Target Groups */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Target Group for Participant (Select all that apply)
+                    Target Group for Participant (Select all that apply) *
                   </label>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2 p-4 border border-gray-300 rounded-lg">
                     {targetGroupOptions.map(group => (
@@ -767,6 +894,9 @@ export default function ProfilePage() {
                     ))}
                   </div>
                 </div>
+                {formData.participant_target_groups.length === 0 && (
+                  <p className="text-xs text-red-600">Select at least one target group.</p>
+                )}
               </>
             )}
 
@@ -792,7 +922,7 @@ export default function ProfilePage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       <MapPin className="h-4 w-4 inline mr-2" />
-                      Location
+                      Location *
                     </label>
                     <input
                       type="text"
@@ -801,19 +931,21 @@ export default function ProfilePage() {
                       onChange={handleInputChange}
                       placeholder="e.g., Munich, Germany"
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Website
+                      Website *
                     </label>
                     <input
-                      type="text"
+                      type="url"
                       name="website"
                       value={formData.website}
                       onChange={handleInputChange}
                       placeholder="your-website.com or https://your-website.com"
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
                     />
                   </div>
                 </div>

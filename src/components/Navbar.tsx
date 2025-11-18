@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Menu, X, Calendar, Users, User, LogOut, Settings } from 'lucide-react'
 
@@ -30,6 +30,7 @@ export default function Navbar() {
   const [loading, setLoading] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const router = useRouter()
+  const pathname = usePathname()
 
   useEffect(() => {
     // Get initial session
@@ -246,6 +247,40 @@ export default function Navbar() {
     return [...baseItems, dashboardItem]
   }
 
+  const isRouteActive = (href: string) => {
+    if (!pathname) return false
+    if (href === '/') {
+      return pathname === '/'
+    }
+    if (href === '/dashboard' && pathname.startsWith('/dashboard/organization')) {
+      return false
+    }
+    if (href === '/dashboard/organization' && pathname === '/dashboard') {
+      return false
+    }
+    return pathname === href || pathname.startsWith(`${href}/`)
+  }
+
+  const getDesktopNavClasses = (href: string) => {
+    const active = isRouteActive(href)
+    return [
+      'px-3 py-2 rounded-md text-sm font-medium transition-colors border',
+      active
+        ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-sm'
+        : 'text-gray-700 hover:text-blue-600 border-transparent',
+    ].join(' ')
+  }
+
+  const getMobileNavClasses = (href: string) => {
+    const active = isRouteActive(href)
+    return [
+      'block px-3 py-2 rounded-md text-base font-medium transition-colors border',
+      active
+        ? 'bg-blue-50 text-blue-700 border-blue-200'
+        : 'text-gray-700 hover:text-blue-600 border-transparent',
+    ].join(' ')
+  }
+
   if (loading) {
     return (
       <nav className="bg-white shadow-sm border-b">
@@ -290,7 +325,7 @@ export default function Navbar() {
               <Link
                 key={item.name}
                 href={item.href}
-                className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                className={getDesktopNavClasses(item.href)}
               >
                 {item.name}
               </Link>
@@ -352,7 +387,7 @@ export default function Navbar() {
                 <Link
                   key={item.name}
                   href={item.href}
-                  className="text-gray-700 hover:text-blue-600 block px-3 py-2 rounded-md text-base font-medium transition-colors"
+                  className={getMobileNavClasses(item.href)}
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   {item.name}
