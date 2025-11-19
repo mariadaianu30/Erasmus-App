@@ -11,16 +11,13 @@ import {
   ArrowLeft, 
   Globe, 
   User, 
-  Mail,
   CheckCircle,
   XCircle,
   AlertCircle,
-  Image,
   DollarSign,
   Languages,
   UtensilsCrossed,
   Car,
-  Building2,
   Tag,
   Download,
   Edit,
@@ -146,6 +143,7 @@ export default function EventDetailsPage() {
       }
     }
     ensureOwnership()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [event?.id, event?.organization_id, event?.organization_name, user?.id, userProfile?.user_type, userProfile?.organization_name, loading])
 
   const fetchEvent = async () => {
@@ -951,7 +949,7 @@ export default function EventDetailsPage() {
                     )}
                     {application.status === 'accepted' && (
                       <p className="text-sm text-green-600 mb-4">
-                        🎉 Congratulations! You've been accepted to this event.
+                        🎉 Congratulations! You&apos;ve been accepted to this event.
                       </p>
                     )}
                     {application.status === 'rejected' && (

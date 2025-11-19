@@ -391,7 +391,7 @@ export default function ProfilePage() {
       
       // Don't redirect automatically - let user see the notification and close it themselves
       // They can navigate back manually or the notification will auto-dismiss
-    } catch (error) {
+    } catch {
       setError('Failed to update profile. Please try again.')
     } finally {
       clearTimeout(timeoutId)

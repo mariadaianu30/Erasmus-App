@@ -26,7 +26,6 @@ interface Project {
 
 export default function ProjectDetailPage() {
   const params = useParams()
-  const router = useRouter()
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)

@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { calculateAge, formatNameField } from '@/lib/utils'
 import { signOutEverywhere } from '@/lib/auth-client'
-import { Calendar, Users, User, LogOut, Plus, Eye, Settings, TrendingUp, Clock, CheckCircle, XCircle, AlertCircle, Edit, Award, Flag, MapPin, Briefcase, Languages, Mail, FileText } from 'lucide-react'
+import { Calendar, Users, User, LogOut, Plus, Settings, TrendingUp, Clock, CheckCircle, XCircle, AlertCircle, Edit, Award, Flag, MapPin, Briefcase, Languages, Mail, FileText } from 'lucide-react'
 import { countries } from '@/lib/countries'
 import { calculateProfileCompletion } from '@/lib/profile-completion'
 
@@ -431,7 +431,7 @@ export default function DashboardPage() {
           setProfile(updatedProfile)
         }
       }
-    } catch (error) {
+    } catch {
       setProfileUpdateMessage('An error occurred while updating profile')
     } finally {
       clearTimeout(timeoutId)

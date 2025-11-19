@@ -17,14 +17,11 @@ import {
   Building,
   Globe,
   Mail,
-  Phone,
   MapPin,
-  User,
   X,
   Flag,
   Briefcase,
   Languages,
-  Award,
   ArrowLeft,
   Download,
   Trash2
@@ -83,9 +80,14 @@ interface AcceptedParticipantRecord {
   profile: ParticipantProfileForCsv | null
 }
 
+interface AuthUser {
+  id: string
+  email?: string
+}
+
 export default function OrganizationDashboard() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<AuthUser | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [events, setEvents] = useState<Event[]>([])
   const [applications, setApplications] = useState<Application[]>([])
@@ -99,8 +101,8 @@ export default function OrganizationDashboard() {
     acceptedApplications: 0,
     upcomingEvents: 0
   })
-  const [selectedParticipant, setSelectedParticipant] = useState<any>(null)
-  const [participantProfile, setParticipantProfile] = useState<any>(null)
+  const [selectedParticipant, setSelectedParticipant] = useState<Application | null>(null)
+  const [participantProfile, setParticipantProfile] = useState<ParticipantProfileForCsv | null>(null)
   const [loadingProfile, setLoadingProfile] = useState(false)
   const [downloadingParticipantCsv, setDownloadingParticipantCsv] = useState(false)
   const [activeTab, setActiveTab] = useState<'events' | 'applications'>('events')
@@ -121,6 +123,7 @@ export default function OrganizationDashboard() {
     if (user && profile) {
       fetchDashboardData()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, profile])
 
   const getSession = async () => {
@@ -319,7 +322,7 @@ export default function OrganizationDashboard() {
         return
       }
 
-      setParticipantProfile(data)
+      setParticipantProfile(data as ParticipantProfileForCsv)
     } catch (error) {
       console.error('Error fetching participant profile:', error)
       setNotification({ type: 'error', message: 'Failed to load participant profile' })
@@ -549,7 +552,7 @@ export default function OrganizationDashboard() {
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Event</h3>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to delete "{showDeleteConfirm.event.title}"? This action cannot be undone and will remove the event for all participants.
+              Are you sure you want to delete &quot;{showDeleteConfirm.event.title}&quot;? This action cannot be undone and will remove the event for all participants.
             </p>
             <div className="flex justify-end gap-3">
               <button
@@ -1417,7 +1420,7 @@ export default function OrganizationDashboard() {
                         </h4>
                         {participantProfile.languages && Array.isArray(participantProfile.languages) && participantProfile.languages.length > 0 ? (
                           <div className="flex flex-wrap gap-2">
-                            {participantProfile.languages.map((lang: any, idx: number) => (
+                            {participantProfile.languages.map((lang: { language: string; level: string }, idx: number) => (
                               <span key={idx} className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">
                                 {lang.language} - {lang.level}
                               </span>

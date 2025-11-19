@@ -8,18 +8,10 @@ import {
   ArrowLeft,
   Calendar,
   CalendarCheck,
-  Car,
   CheckCircle,
-  DollarSign,
-  Edit3,
-  Image,
-  Languages,
   Loader2,
-  MapPin,
   Save,
-  Tag,
   Trash2,
-  Users,
 } from 'lucide-react'
 import { countries } from '@/lib/countries'
 
@@ -90,7 +82,6 @@ export default function EditEventPage() {
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [existingPhotoUrl, setExistingPhotoUrl] = useState<string | null>(null)
-  const [existingDescription, setExistingDescription] = useState<string | null>(null)
   const [formData, setFormData] = useState<EventFormState>({
     title: '',
     event_type: '',

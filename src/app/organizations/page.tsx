@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Building, MapPin, Globe, Calendar, Search, Users, Award } from 'lucide-react'
+import { Building, MapPin, Globe, Search, Users, Award } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 const slugifyOrganizationName = (name: string) =>
@@ -68,13 +68,6 @@ export default function OrganizationsPage() {
            (org.location && org.location.toLowerCase().includes(searchTerm.toLowerCase()))
   })
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })
-  }
 
   if (loading) {
     return (

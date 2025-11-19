@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { motion, useScroll, useTransform, useInView, useMotionValue, useSpring } from 'framer-motion'
-import { Calendar, Users, ArrowRight, Star, CheckCircle, Globe, Award, TrendingUp, Sparkles, Heart } from 'lucide-react'
+import { Calendar, Users, ArrowRight, Star, CheckCircle, Award } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 interface Stats {
@@ -278,7 +278,7 @@ export default function Home() {
         pendingApplications: pendingAppsResult.count || 0,
         upcomingEvents: upcomingEventsResult.count || 0
       })
-    } catch (error) {
+    } catch {
       setStats({
         totalEvents: 0,
         totalOrganizations: 0,

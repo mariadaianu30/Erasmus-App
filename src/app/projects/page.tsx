@@ -30,7 +30,6 @@ export default function ProjectsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
-  const router = useRouter()
 
   useEffect(() => {
     checkUser()

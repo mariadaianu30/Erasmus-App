@@ -47,7 +47,7 @@ export default function MyApplicationsPage() {
       setUser(session.user)
       
       // Check if profile exists first
-      const { data: profileData, error: profileError } = await supabase
+      const { error: profileError } = await supabase
         .from('profiles')
         .select('user_type')
         .eq('id', session.user.id)
@@ -224,8 +224,8 @@ export default function MyApplicationsPage() {
               </h3>
               <p className="text-gray-500 mb-6">
                 {filter === 'all' 
-                  ? "You haven't applied to any events yet. Start exploring!"
-                  : `You don't have any ${filter} applications at the moment.`
+                  ? "You haven&apos;t applied to any events yet. Start exploring!"
+                  : `You don&apos;t have any ${filter} applications at the moment.`
                 }
               </p>
               {filter === 'all' && (
@@ -326,7 +326,7 @@ export default function MyApplicationsPage() {
                                 Your application is being reviewed by the organization.
                               </p>
                               <p className="text-xs text-blue-700 mt-1">
-                                You'll be notified once a decision is made.
+                                You&apos;ll be notified once a decision is made.
                               </p>
                             </div>
                           </div>

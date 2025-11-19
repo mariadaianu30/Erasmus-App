@@ -14,7 +14,6 @@ import {
   Search,
   Users,
   AlertTriangle,
-  CheckCircle,
   UploadCloud
 } from 'lucide-react'
 

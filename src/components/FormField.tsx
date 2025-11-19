@@ -99,7 +99,7 @@ export default function FormField({
           disabled={disabled}
           aria-label={ariaLabel || label}
           aria-describedby={describedBy}
-          aria-invalid={showError}
+          aria-invalid={showError ? true : undefined}
           aria-required={required}
           className={baseInputClasses}
         />
@@ -114,7 +114,7 @@ export default function FormField({
           disabled={disabled}
           aria-label={ariaLabel || label}
           aria-describedby={describedBy}
-          aria-invalid={showError}
+          aria-invalid={showError ? true : undefined}
           aria-required={required}
           className={baseInputClasses}
         >
@@ -141,7 +141,7 @@ export default function FormField({
           disabled={disabled}
           aria-label={ariaLabel || label}
           aria-describedby={describedBy}
-          aria-invalid={showError}
+          aria-invalid={showError ? true : undefined}
           aria-required={required}
           className={baseInputClasses}
         />

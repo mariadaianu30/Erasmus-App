@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { signOutEverywhere } from '@/lib/auth-client'
-import { Menu, X, Calendar, Users, User, LogOut, Settings } from 'lucide-react'
+import { Menu, X, Calendar, User, LogOut } from 'lucide-react'
 
 interface User {
   id: string

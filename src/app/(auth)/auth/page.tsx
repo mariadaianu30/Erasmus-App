@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Mail, Lock, Eye, EyeOff, User, ArrowRight, Users, UserCheck, Flag, MapPin, Briefcase, Languages, Calendar } from 'lucide-react'
@@ -259,7 +258,7 @@ export default function AuthPage() {
             }
           : null
 
-      const metadata: Record<string, any> = {
+      const metadata: Record<string, unknown> = {
         first_name: formattedFirstName,
         last_name: formattedLastName,
         user_type: formData.userType,
@@ -309,7 +308,7 @@ export default function AuthPage() {
 
         // Create profile with all participant fields
         if (authData.user && hasActiveSession && formData.userType === 'participant') {
-          const profileData: any = {
+          const profileData: Record<string, unknown> = {
             id: authData.user.id,
             user_type: 'participant',
             first_name: formattedFirstName,
@@ -362,7 +361,7 @@ export default function AuthPage() {
 
         router.push(postSignUpDestination)
         router.refresh()
-      } catch (error) {
+      } catch {
         setError('An unexpected error occurred')
       } finally {
         setLoading(false)
@@ -370,17 +369,17 @@ export default function AuthPage() {
     } else {
       // Login logic
       try {
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { error: loginError } = await supabase.auth.signInWithPassword({
           email: formData.email,
           password: formData.password,
         })
 
-        if (error) {
-          setError(error.message)
+        if (loginError) {
+          setError(loginError.message)
         } else {
           router.push('/dashboard')
         }
-      } catch (error) {
+      } catch {
         setError('An unexpected error occurred')
       } finally {
         setLoading(false)
