@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { signOutEverywhere } from '@/lib/auth-client'
 import { Menu, X, Calendar, Users, User, LogOut, Settings } from 'lucide-react'
 
 interface User {
@@ -29,6 +30,7 @@ export default function Navbar() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
 
@@ -142,20 +144,21 @@ export default function Navbar() {
   }
 
   const handleSignOut = async () => {
+    if (signingOut) return
+    setSigningOut(true)
     try {
-      const { error } = await supabase.auth.signOut()
-      if (error) {
-        console.error('Error signing out:', error)
-        return
+      const result = await signOutEverywhere()
+      if (!result.success && result.error) {
+        console.error('Error signing out:', result.error)
       }
-      // Clear local state
-      setUser(null)
-      setProfile(null)
-      // Redirect to home page
-      router.push('/')
-      router.refresh()
     } catch (error) {
       console.error('Error signing out:', error)
+    } finally {
+      setUser(null)
+      setProfile(null)
+      router.push('/')
+      router.refresh()
+      setSigningOut(false)
     }
   }
 
@@ -345,10 +348,20 @@ export default function Navbar() {
                 </Link>
                 <button
                   onClick={handleSignOut}
+                  disabled={signingOut}
                   className="flex items-center bg-red-50 text-red-700 hover:bg-red-100 px-3 py-2 rounded-md text-sm font-medium transition-colors border border-red-200"
                 >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Sign Out
+                  {signingOut ? (
+                    <>
+                      <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-red-600 mr-2" />
+                      Signing out...
+                    </>
+                  ) : (
+                    <>
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Sign Out
+                    </>
+                  )}
                 </button>
               </div>
             ) : (
@@ -421,10 +434,20 @@ export default function Navbar() {
                       handleSignOut()
                       setMobileMenuOpen(false)
                     }}
+                  disabled={signingOut}
                     className="flex items-center bg-red-50 text-red-700 hover:bg-red-100 px-3 py-2 rounded-md text-base font-medium transition-colors w-full text-left border border-red-200"
                   >
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Sign Out
+                  {signingOut ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600 mr-2" />
+                      Signing out...
+                    </>
+                  ) : (
+                    <>
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Sign Out
+                    </>
+                  )}
                   </button>
                 </div>
               )}

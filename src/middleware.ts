@@ -66,6 +66,7 @@ export async function middleware(request: NextRequest) {
     '/my-applications',
     '/events/create',
     '/events/manage',
+    '/events/edit',
     '/applications',
   ]
 
@@ -85,7 +86,8 @@ export async function middleware(request: NextRequest) {
       request.nextUrl.pathname === '/dashboard/organization' ||
       request.nextUrl.pathname === '/profile' ||
       request.nextUrl.pathname === '/profile/organization' ||
-      request.nextUrl.pathname === '/events/create') {
+      request.nextUrl.pathname === '/events/create' ||
+      request.nextUrl.pathname.startsWith('/events/edit/')) {
     return response
   }
 

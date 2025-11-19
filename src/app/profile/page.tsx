@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { calculateAge } from '@/lib/utils'
-import { User, Save, ArrowLeft, Mail, MapPin, Calendar, Building, FileText, Languages, Flag, Briefcase, AlertCircle, CheckCircle } from 'lucide-react'
+import { calculateAge, formatNameField } from '@/lib/utils'
+import { User, Save, ArrowLeft, Mail, MapPin, Calendar, Building, FileText, Languages, Flag, Briefcase, AlertCircle, CheckCircle, X } from 'lucide-react'
 import { countries } from '@/lib/countries'
 import Link from 'next/link'
+import { calculateProfileCompletion } from '@/lib/profile-completion'
 
 interface User {
   id: string
@@ -208,6 +209,18 @@ export default function ProfilePage() {
     }
   }
 
+  // Auto-dismiss success notification after 5 seconds (longer so user can see it)
+  useEffect(() => {
+    if (success) {
+      console.log('✅ Notification is visible, will auto-dismiss in 5 seconds')
+      const timer = setTimeout(() => {
+        console.log('✅ Auto-dismissing notification')
+        setSuccess('')
+      }, 5000) // Increased to 5 seconds
+      return () => clearTimeout(timer)
+    }
+  }, [success])
+
   useEffect(() => {
     const getSession = async () => {
       try {
@@ -342,8 +355,8 @@ export default function ProfilePage() {
 
       // Update fields based on user type
       if (profile.user_type === 'participant') {
-        updateData.first_name = formData.first_name.trim()
-        updateData.last_name = formData.last_name.trim()
+        updateData.first_name = formatNameField(formData.first_name) || ''
+        updateData.last_name = formatNameField(formData.last_name) || ''
         updateData.birth_date = formData.birth_date || null
         updateData.bio = formData.bio.trim()
         updateData.location = formData.location.trim()
@@ -358,7 +371,7 @@ export default function ProfilePage() {
         updateData.languages = formData.languages.length > 0 ? formData.languages : null
         updateData.participant_target_groups = formData.participant_target_groups.length > 0 ? formData.participant_target_groups : null
       } else {
-        updateData.organization_name = formData.organization_name.trim()
+        updateData.organization_name = formatNameField(formData.organization_name) || ''
         updateData.bio = formData.bio.trim()
         updateData.location = formData.location.trim()
         updateData.website = formData.website.trim() || null
@@ -374,15 +387,10 @@ export default function ProfilePage() {
       }
 
       setSuccess('Profile updated successfully!')
+      console.log('✅ Success notification set!')
       
-      // Redirect to dashboard after successful save
-      setTimeout(() => {
-        if (profile.user_type === 'organization') {
-          router.push('/dashboard/organization')
-        } else {
-          router.push('/dashboard')
-        }
-      }, 1000)
+      // Don't redirect automatically - let user see the notification and close it themselves
+      // They can navigate back manually or the notification will auto-dismiss
     } catch (error) {
       setError('Failed to update profile. Please try again.')
     } finally {
@@ -516,12 +524,14 @@ export default function ProfilePage() {
     )
   }
 
+  const profileCompletion = calculateProfileCompletion(profile, profile.user_type)
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center">
               <Link
                 href={profile?.user_type === 'organization' ? '/dashboard/organization' : '/dashboard'}
@@ -531,30 +541,77 @@ export default function ProfilePage() {
                 Back to Dashboard
               </Link>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Edit Profile</h1>
-              <p className="text-gray-600 mt-2">
-                {profile.user_type === 'participant' 
-                  ? 'Update your personal information'
-                  : 'Update your organization information'
-                }
-              </p>
+            <div className="flex-1">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900">Edit Profile</h1>
+                  <p className="text-gray-600 mt-2">
+                    {profile.user_type === 'participant' 
+                      ? 'Update your personal information'
+                      : 'Update your organization information'
+                    }
+                  </p>
+                </div>
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                    profileCompletion.percent === 100 ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'
+                  }`}
+                >
+                  {profileCompletion.percent === 100 && <CheckCircle className="h-3 w-3" />}
+                  {profileCompletion.percent}% complete
+                </span>
+              </div>
+              {profileCompletion.percent < 100 && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Missing: {profileCompletion.missing.join(', ')}
+                </p>
+              )}
             </div>
           </div>
         </div>
 
+        {/* Success Toast Notification */}
+        {success && (
+          <div 
+            className="fixed top-4 right-4 left-4 sm:left-auto z-[99999] animate-slide-in max-w-md mx-auto sm:mx-0"
+            style={{ zIndex: 99999 }}
+          >
+            <div className="bg-green-500 border-2 border-green-600 text-white rounded-lg shadow-2xl p-4 flex items-start gap-3">
+              <CheckCircle className="h-6 w-6 text-white flex-shrink-0 mt-0.5" aria-hidden="true" />
+              <div className="flex-1 min-w-0">
+                <p className="text-base font-semibold">{success}</p>
+              </div>
+              <button
+                onClick={() => {
+                  console.log('Closing notification')
+                  setSuccess('')
+                }}
+                className="text-white hover:text-green-100 transition-colors flex-shrink-0 p-1 rounded hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-green-500"
+                aria-label="Close notification"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Profile Form */}
         <div className="bg-white rounded-lg shadow-sm border">
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
-            {/* Success/Error Messages */}
-            {success && (
-              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md">
-                {success}
-              </div>
-            )}
+            {/* Error Message */}
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
-                {error}
+              <div className="bg-red-50 border border-red-200 text-red-800 rounded-lg p-4 flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{error}</p>
+                </div>
+                <button
+                  onClick={() => setError('')}
+                  className="text-red-600 hover:text-red-800 transition-colors flex-shrink-0 p-1 rounded hover:bg-red-100"
+                  aria-label="Close error"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
             )}
 

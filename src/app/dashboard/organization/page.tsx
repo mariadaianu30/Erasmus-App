@@ -26,7 +26,8 @@ import {
   Languages,
   Award,
   ArrowLeft,
-  Download
+  Download,
+  Trash2
 } from 'lucide-react'
 import Link from 'next/link'
 import Notification from '@/components/Notification'
@@ -43,6 +44,8 @@ interface Event {
   category: string
   is_published: boolean
   created_at: string
+  organization_id?: string | null
+  organization_name?: string | null
 }
 
 interface Application {
@@ -88,6 +91,7 @@ export default function OrganizationDashboard() {
   const [applications, setApplications] = useState<Application[]>([])
   const [loading, setLoading] = useState(true)
   const [notification, setNotification] = useState<{type: 'success' | 'error' | 'warning', message: string} | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<{event: Event | null}>({ event: null })
   const [stats, setStats] = useState({
     totalEvents: 0,
     totalApplications: 0,
@@ -107,6 +111,7 @@ export default function OrganizationDashboard() {
   const [acceptedModalLoading, setAcceptedModalLoading] = useState(false)
   const [acceptedModalError, setAcceptedModalError] = useState<string | null>(null)
   const [acceptedModalExporting, setAcceptedModalExporting] = useState(false)
+  const [deletingEventId, setDeletingEventId] = useState<string | null>(null)
 
   useEffect(() => {
     getSession()
@@ -149,6 +154,17 @@ export default function OrganizationDashboard() {
     setProfile(profileData)
   }
 
+  const normalizeOrgName = (value?: string | null) =>
+    value?.trim().toLowerCase().replace(/\s+/g, ' ') || null
+
+  const ownsEvent = (event: Event) => {
+    if (!user) return false
+    if (event.organization_id) {
+      return event.organization_id === user.id
+    }
+    return normalizeOrgName(event.organization_name) === normalizeOrgName(profile?.organization_name)
+  }
+
   const fetchDashboardData = async () => {
     if (!user || !profile) return
 
@@ -156,32 +172,56 @@ export default function OrganizationDashboard() {
       console.log('Fetching events for organization user:', user.id)
       
       // Fetch organization events
-      const { data: eventsData, error: eventsError } = await supabase
+      const { data: eventsById, error: eventsError } = await supabase
         .from('events')
         .select('*')
         .eq('organization_id', user.id)
         .order('created_at', { ascending: false })
 
+      const uniqueEvents = new Map<string, Event>()
+
       if (eventsError) {
         console.log('Events query error (non-critical):', eventsError)
         console.log('Error details:', JSON.stringify(eventsError, null, 2))
-        setEvents([])
-      } else {
-        console.log('Organization events fetched successfully:', eventsData)
-        console.log('Number of events:', eventsData?.length || 0)
-        setEvents(eventsData || [])
+      } else if (eventsById) {
+        eventsById.forEach(event => uniqueEvents.set(event.id, event))
       }
+
+      if (profile.organization_name) {
+        const { data: eventsByName, error: eventsByNameError } = await supabase
+          .from('events')
+          .select('*')
+          .ilike('organization_name', profile.organization_name)
+          .order('created_at', { ascending: false })
+
+        if (eventsByNameError) {
+          console.log('Events-by-name query error (non-critical):', eventsByNameError)
+          console.log('Error details:', JSON.stringify(eventsByNameError, null, 2))
+        } else if (eventsByName) {
+          eventsByName.forEach(event => {
+            if (ownsEvent(event)) {
+              uniqueEvents.set(event.id, event)
+            }
+          })
+        }
+      }
+
+      const mergedEvents = Array.from(uniqueEvents.values()).sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )
+
+      setEvents(mergedEvents)
 
       // Fetch applications for organization events
       let applicationsData = []
-      console.log('Organization events found:', eventsData?.length || 0)
-      console.log('Event IDs:', eventsData?.map(e => e.id) || [])
+      console.log('Organization events found:', mergedEvents.length)
+      console.log('Event IDs:', mergedEvents.map(e => e.id))
       
-      if (eventsData && eventsData.length > 0) {
+      if (mergedEvents.length > 0) {
         const { data: appData, error: applicationsError } = await supabase
           .from('applications_with_details')
           .select('*')
-          .in('event_id', eventsData.map(e => e.id))
+          .in('event_id', mergedEvents.map(e => e.id))
           .order('created_at', { ascending: false })
 
         if (applicationsError) {
@@ -197,12 +237,12 @@ export default function OrganizationDashboard() {
       setApplications(applicationsData)
 
       // Calculate stats
-      const upcomingEvents = eventsData?.filter(e => new Date(e.start_date) > new Date()).length || 0
+      const upcomingEvents = mergedEvents.filter(e => new Date(e.start_date) > new Date()).length
       const pendingApps = applicationsData.filter(a => a.status === 'pending').length
       const acceptedApps = applicationsData.filter(a => a.status === 'accepted').length
 
       setStats({
-        totalEvents: eventsData?.length || 0,
+        totalEvents: mergedEvents.length,
         totalApplications: applicationsData.length,
         pendingApplications: pendingApps,
         acceptedApplications: acceptedApps,
@@ -384,6 +424,65 @@ export default function OrganizationDashboard() {
     await loadAcceptedParticipantsIntoModal(event.id)
   }
 
+  const handleEditEvent = (event: Event) => {
+    console.log('Dashboard - Edit button clicked for event:', event.id, event.title)
+    console.log('Dashboard - Ownership check:', ownsEvent(event))
+    if (!ownsEvent(event)) {
+      console.error('Dashboard - Ownership check failed')
+      setNotification({ type: 'error', message: 'You can edit only events created by your organization.' })
+      return
+    }
+    const editUrl = `/events/edit/${event.id}`
+    console.log('Dashboard - Navigating to edit page:', editUrl)
+    // Use direct navigation as fallback to ensure it works
+    try {
+      router.push(editUrl)
+      // Fallback after a short delay if router.push doesn't work
+      setTimeout(() => {
+        if (window.location.pathname !== editUrl) {
+          console.log('Dashboard - Router.push failed, using window.location')
+          window.location.href = editUrl
+        }
+      }, 100)
+    } catch (err) {
+      console.error('Dashboard - Navigation error:', err)
+      window.location.href = editUrl
+    }
+  }
+
+  const handleDeleteEvent = (event: Event) => {
+    if (!ownsEvent(event)) {
+      setNotification({ type: 'error', message: 'You can delete only events created by your organization.' })
+      return
+    }
+    setShowDeleteConfirm({ event })
+  }
+
+  const confirmDeleteEvent = async () => {
+    const event = showDeleteConfirm.event
+    if (!event) return
+    
+    setShowDeleteConfirm({ event: null })
+    setDeletingEventId(event.id)
+    try {
+      const { error } = await supabase
+        .from('events')
+        .delete()
+        .eq('id', event.id)
+
+      if (error) throw error
+
+      setNotification({ type: 'success', message: 'Event deleted successfully.' })
+      setSelectedEvent(null)
+      await fetchDashboardData()
+    } catch (error) {
+      console.error('Error deleting event:', error)
+      setNotification({ type: 'error', message: 'Failed to delete event. Please try again.' })
+    } finally {
+      setDeletingEventId(null)
+    }
+  }
+
   const handleRefreshAcceptedModal = async () => {
     if (!acceptedModalEvent) return
     await loadAcceptedParticipantsIntoModal(acceptedModalEvent.id)
@@ -442,15 +541,40 @@ export default function OrganizationDashboard() {
     return age
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    )
-  }
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm.event && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Event</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete "{showDeleteConfirm.event.title}"? This action cannot be undone and will remove the event for all participants.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm({ event: null })}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteEvent}
+                disabled={deletingEventId === showDeleteConfirm.event.id}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deletingEventId === showDeleteConfirm.event.id ? 'Deleting...' : 'Delete Event'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-      return (
+      {loading ? (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      ) : (
         <div className="min-h-screen bg-gray-50 py-8">
           {notification && (
             <Notification
@@ -591,7 +715,7 @@ export default function OrganizationDashboard() {
               {selectedEvent ? (
                 // Show applications for selected event
                 <div>
-                  <div className="mb-6 flex items-center justify-between">
+                  <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
                       <button
                         onClick={() => setSelectedEvent(null)}
@@ -604,20 +728,21 @@ export default function OrganizationDashboard() {
                       <p className="text-gray-600 mt-1">
                         {formatDate(selectedEvent.start_date)} - {formatDate(selectedEvent.end_date)}
                       </p>
+                      <Link
+                        href={`/events/${selectedEvent.id}`}
+                        className="text-sm text-blue-600 hover:text-blue-800 inline-flex items-center gap-1 mt-2"
+                        title="View public event page"
+                      >
+                        <Eye className="h-4 w-4" />
+                        View public event page
+                      </Link>
                     </div>
-                    <Link
-                      href={`/events/${selectedEvent.id}`}
-                      className="text-blue-600 hover:text-blue-800"
-                      title="View Event Details"
-                    >
-                      <Eye className="h-5 w-5" />
-                    </Link>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row gap-3 mb-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
                     <button
                       onClick={() => handleOpenAcceptedModalForEvent(selectedEvent)}
-                      className="flex-1 inline-flex items-center justify-center gap-2 border border-blue-200 text-blue-700 font-semibold px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
+                      className="inline-flex items-center justify-center gap-2 border border-blue-200 text-blue-700 font-semibold px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
                     >
                       <Users className="h-4 w-4" />
                       List Accepted Participants
@@ -625,7 +750,7 @@ export default function OrganizationDashboard() {
                     <button
                       onClick={() => handleExportAcceptedParticipantsCsv(selectedEvent)}
                       disabled={acceptedModalExporting}
-                      className="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      className="inline-flex items-center justify-center gap-2 bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       {acceptedModalExporting ? (
                         <>
@@ -636,6 +761,36 @@ export default function OrganizationDashboard() {
                         <>
                           <Download className="h-4 w-4" />
                           Export Accepted as CSV
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        handleEditEvent(selectedEvent)
+                      }}
+                      disabled={!ownsEvent(selectedEvent)}
+                      className="inline-flex items-center justify-center gap-2 border border-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Edit className="h-4 w-4" />
+                      Edit Event
+                    </button>
+                    <button
+                      onClick={() => handleDeleteEvent(selectedEvent)}
+                      disabled={deletingEventId === selectedEvent.id}
+                      className="inline-flex items-center justify-center gap-2 border border-red-300 text-red-700 font-semibold px-4 py-2 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {deletingEventId === selectedEvent.id ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600" />
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="h-4 w-4" />
+                          Delete Event
                         </>
                       )}
                     </button>
@@ -728,9 +883,6 @@ export default function OrganizationDashboard() {
                 <div>
                   <div className="flex items-center justify-between mb-6">
                     <h2 className="text-xl font-semibold text-gray-900">Your Events</h2>
-                    <Link href="/events/manage" className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                      Manage All
-                    </Link>
                   </div>
                   {events.length === 0 ? (
                     <div className="text-center py-12">
@@ -797,7 +949,7 @@ export default function OrganizationDashboard() {
                               </div>
                             </div>
                             <div className="mt-4 pt-4 border-t border-gray-200">
-                              <p className="text-xs text-blue-600 font-medium">Click to view applications →</p>
+                              <p className="text-xs text-blue-600 font-medium">Manage event →</p>
                             </div>
                           </div>
                         )
@@ -1324,6 +1476,8 @@ export default function OrganizationDashboard() {
               )}
             </div>
           </div>
+        </div>
+      )}
         </div>
       )}
     </div>

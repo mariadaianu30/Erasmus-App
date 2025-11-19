@@ -4,26 +4,11 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { calculateAge } from '@/lib/utils'
+import { calculateAge, formatNameField } from '@/lib/utils'
+import { signOutEverywhere } from '@/lib/auth-client'
 import { Calendar, Users, User, LogOut, Plus, Eye, Settings, TrendingUp, Clock, CheckCircle, XCircle, AlertCircle, Edit, Award, Flag, MapPin, Briefcase, Languages, Mail, FileText } from 'lucide-react'
 import { countries } from '@/lib/countries'
-
-const PARTICIPANT_COMPLETION_FIELDS = [
-  'first_name',
-  'last_name',
-  'birth_date',
-  'location',
-  'gender',
-  'nationality',
-  'citizenships',
-  'residency_country',
-  'role_in_project',
-  'languages',
-  'participant_target_groups',
-  'bio'
-] as const
-
-const ORGANIZATION_COMPLETION_FIELDS = ['organization_name', 'location', 'bio'] as const
+import { calculateProfileCompletion } from '@/lib/profile-completion'
 
 interface User {
   id: string
@@ -81,6 +66,7 @@ export default function DashboardPage() {
   const [applications, setApplications] = useState<Application[]>([])
   const [applicationStats, setApplicationStats] = useState<ApplicationStats>({ total: 0, pending: 0, accepted: 0, rejected: 0 })
   const [loading, setLoading] = useState(true)
+  const [signingOut, setSigningOut] = useState(false)
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [profileForm, setProfileForm] = useState({
     first_name: '',
@@ -361,20 +347,21 @@ export default function DashboardPage() {
   }
 
   const handleSignOut = async () => {
+    if (signingOut) return
+    setSigningOut(true)
     try {
-      const { error } = await supabase.auth.signOut()
-      if (error) {
-        console.error('Error signing out:', error)
-        return
+      const result = await signOutEverywhere()
+      if (!result.success && result.error) {
+        console.error('Error signing out:', result.error)
       }
-      // Clear local state
-      setUser(null)
-      setProfile(null)
-      // Redirect to home page
-      router.push('/')
-      router.refresh()
     } catch (error) {
       console.error('Error signing out:', error)
+    } finally {
+      setUser(null)
+      setProfile(null)
+      router.push('/')
+      router.refresh()
+      setSigningOut(false)
     }
   }
 
@@ -395,9 +382,12 @@ export default function DashboardPage() {
       // Handle website field - simple cleanup
       const websiteValue = profileForm.website?.trim() || null;
 
+      const formattedFirstName = formatNameField(profileForm.first_name) || ''
+      const formattedLastName = formatNameField(profileForm.last_name) || ''
+
       const updateData: any = {
-        first_name: profileForm.first_name,
-        last_name: profileForm.last_name,
+        first_name: formattedFirstName,
+        last_name: formattedLastName,
         bio: profileForm.bio,
         location: profileForm.location,
         birth_date: profileForm.birth_date || null,
@@ -569,25 +559,7 @@ export default function DashboardPage() {
     )
   }
 
-  const profileCompletion = (() => {
-    const fields: string[] =
-      profile.user_type === 'participant'
-        ? [...PARTICIPANT_COMPLETION_FIELDS]
-        : [...ORGANIZATION_COMPLETION_FIELDS]
-
-    const fieldFilled = (field: string) => {
-      const value = (profile as any)[field]
-      if (Array.isArray(value)) return value.length > 0
-      if (value === null || value === undefined) return false
-      return value.toString().trim().length > 0
-    }
-
-    const filled = fields.filter(fieldFilled)
-    const total = fields.length
-    const percent = total === 0 ? 100 : Math.round((filled.length / total) * 100)
-    const missing = fields.filter(field => !fieldFilled(field))
-    return { percent, missing }
-  })()
+  const profileCompletion = calculateProfileCompletion(profile, profile.user_type)
 
   const renderProfileField = (
     label: string,
@@ -688,10 +660,20 @@ export default function DashboardPage() {
             </div>
             <button
               onClick={handleSignOut}
+              disabled={signingOut}
               className="flex items-center text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md hover:bg-gray-100"
             >
-              <LogOut className="h-5 w-5 mr-2" />
-              Sign Out
+              {signingOut ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2" />
+                  Signing out...
+                </>
+              ) : (
+                <>
+                  <LogOut className="h-5 w-5 mr-2" />
+                  Sign Out
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -1386,13 +1368,6 @@ export default function DashboardPage() {
                   >
                     <Plus className="h-5 w-5 mr-2" />
                     Create Event
-                  </Link>
-                  <Link
-                    href="/events/manage"
-                    className="w-full flex items-center justify-center px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 transition-colors"
-                  >
-                    <Calendar className="h-5 w-5 mr-2" />
-                    Manage Events
                   </Link>
                   <Link
                     href="/applications"

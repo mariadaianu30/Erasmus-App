@@ -22,7 +22,9 @@ import {
   Car,
   Building2,
   Tag,
-  Download
+  Download,
+  Edit,
+  Trash2
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/lib/utils'
@@ -93,6 +95,8 @@ export default function EventDetailsPage() {
   const [participantsLoaded, setParticipantsLoaded] = useState(false)
   const [showAcceptedModal, setShowAcceptedModal] = useState(false)
   const [exportingParticipants, setExportingParticipants] = useState(false)
+  const [deletingEvent, setDeletingEvent] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   useEffect(() => {
     fetchEvent()
@@ -108,6 +112,41 @@ export default function EventDetailsPage() {
       return () => clearTimeout(timer)
     }
   }, [toast])
+
+  // Ensure ownership is backfilled for organization users (must be before early returns)
+  useEffect(() => {
+    const ensureOwnership = async () => {
+      // Only run if we have the necessary data
+      if (!event || !user || loading) return
+      
+      const normalizeOrgName = (value?: string | null) =>
+        value?.trim().toLowerCase().replace(/\s+/g, ' ') || null
+
+      const eventOrgName = normalizeOrgName(event.organization_name)
+      const userOrgName = normalizeOrgName(userProfile?.organization_name)
+      const isOrganizationUser = userProfile?.user_type === 'organization'
+
+      const canManageEvent = Boolean(
+        isOrganizationUser &&
+        (
+          (event.organization_id && user.id === event.organization_id) ||
+          (!event.organization_id && eventOrgName && userOrgName && eventOrgName === userOrgName)
+        )
+      )
+
+      if (canManageEvent && !event.organization_id && user.id) {
+        try {
+          await supabase
+            .from('events')
+            .update({ organization_id: user.id, organization_name: event.organization_name || userProfile?.organization_name })
+            .eq('id', event.id)
+        } catch (error) {
+          console.error('Failed to backfill organization_id:', error)
+        }
+      }
+    }
+    ensureOwnership()
+  }, [event?.id, event?.organization_id, event?.organization_name, user?.id, userProfile?.user_type, userProfile?.organization_name, loading])
 
   const fetchEvent = async () => {
     try {
@@ -135,7 +174,7 @@ export default function EventDetailsPage() {
       // Fetch user profile to check user type
       const { data: profile } = await supabase
         .from('profiles')
-        .select('user_type')
+        .select('user_type, organization_name')
         .eq('id', user.id)
         .single()
 
@@ -264,11 +303,21 @@ export default function EventDetailsPage() {
     )
   }
 
+  const normalizeOrgName = (value?: string | null) =>
+    value?.trim().toLowerCase().replace(/\s+/g, ' ') || null
+
+  const eventOrgName = normalizeOrgName(event.organization_name)
+  const userOrgName = normalizeOrgName(userProfile?.organization_name)
+
+  const isOrganizationUser = userProfile?.user_type === 'organization'
+
   const canManageEvent = Boolean(
     user &&
-    userProfile?.user_type === 'organization' &&
-    event.organization_id &&
-    user.id === event.organization_id
+    isOrganizationUser &&
+    (
+      (event.organization_id && user.id === event.organization_id) ||
+      (!event.organization_id && eventOrgName && userOrgName && eventOrgName === userOrgName)
+    )
   )
 
   const getStatusIcon = (status: string) => {
@@ -420,8 +469,75 @@ export default function EventDetailsPage() {
     }
   }
 
+  const handleDeleteEvent = () => {
+    if (!event || deletingEvent) return
+    if (!canManageEvent) {
+      setToast({ message: 'Only the organizing account can delete this event.', type: 'error' })
+      return
+    }
+    setShowDeleteConfirm(true)
+  }
+
+  const confirmDeleteEvent = async () => {
+    if (!event || deletingEvent) return
+    setShowDeleteConfirm(false)
+    setDeletingEvent(true)
+    try {
+      let deleteQuery = supabase
+        .from('events')
+        .delete()
+        .eq('id', event.id)
+
+      if (event.organization_id) {
+        deleteQuery = deleteQuery.eq('organization_id', event.organization_id)
+      } else if (event.organization_name) {
+        deleteQuery = deleteQuery.eq('organization_name', event.organization_name)
+      }
+
+      const { error } = await deleteQuery
+
+      if (error) throw error
+
+      setToast({ message: 'Event deleted successfully.', type: 'success' })
+      setTimeout(() => {
+        router.push('/events')
+      }, 1200)
+    } catch (error) {
+      console.error('Error deleting event:', error)
+      setToast({ message: 'Failed to delete event. Please try again.', type: 'error' })
+      setDeletingEvent(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Event</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete this event? This action cannot be undone and will remove the event for all participants.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteEvent}
+                disabled={deletingEvent}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deletingEvent ? 'Deleting...' : 'Delete Event'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Toast Notification */}
       {toast && (
         <div className="fixed top-4 right-4 z-50 animate-slide-in">
@@ -480,32 +596,59 @@ export default function EventDetailsPage() {
                 </div>
 
                 {canManageEvent && (
-                  <div className="flex flex-wrap gap-3 mb-6">
-                    <button
-                      onClick={handleOpenAcceptedModal}
-                      className="inline-flex items-center gap-2 border border-blue-200 text-blue-700 font-semibold px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
-                    >
-                      <Users className="h-4 w-4" />
-                      List Accepted Participants
-                    </button>
-                    <button
-                      onClick={handleExportParticipantsCsv}
-                      disabled={exportingParticipants}
-                      className="inline-flex items-center gap-2 bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      {exportingParticipants ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                          Preparing CSV...
-                        </>
-                      ) : (
-                        <>
-                          <Download className="h-4 w-4" />
-                          Export Accepted as CSV
-                        </>
-                      )}
-                    </button>
-                  </div>
+                  <>
+                    <div className="flex flex-wrap gap-3 mb-4">
+                      <button
+                        onClick={handleOpenAcceptedModal}
+                        className="inline-flex items-center gap-2 border border-blue-200 text-blue-700 font-semibold px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
+                      >
+                        <Users className="h-4 w-4" />
+                        List Accepted Participants
+                      </button>
+                      <button
+                        onClick={handleExportParticipantsCsv}
+                        disabled={exportingParticipants}
+                        className="inline-flex items-center gap-2 bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {exportingParticipants ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                            Preparing CSV...
+                          </>
+                        ) : (
+                          <>
+                            <Download className="h-4 w-4" />
+                            Export Accepted as CSV
+                          </>
+                        )}
+                      </button>
+                      <Link
+                        href={`/events/edit/${event.id}`}
+                        prefetch={false}
+                        className="inline-flex items-center gap-2 border border-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        <Edit className="h-4 w-4" />
+                        Edit Event
+                      </Link>
+                      <button
+                        onClick={handleDeleteEvent}
+                        disabled={deletingEvent}
+                        className="inline-flex items-center gap-2 border border-red-300 text-red-700 font-semibold px-4 py-2 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {deletingEvent ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600" />
+                            Deleting...
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 className="h-4 w-4" />
+                            Delete Event
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </>
                 )}
 
                 {/* Event Details - Restructured */}
@@ -610,7 +753,7 @@ export default function EventDetailsPage() {
                 {event.short_description && (
                   <div className="mb-6">
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">Short Description</h3>
-                    <p className="text-gray-700 leading-relaxed">
+                    <p className="text-gray-700 leading-relaxed break-words">
                       {event.short_description}
                     </p>
                   </div>
@@ -620,7 +763,7 @@ export default function EventDetailsPage() {
                 {event.full_description && (
                   <div className="prose max-w-none mb-6">
                     <h3 className="text-xl font-semibold text-gray-900 mb-3">Full Description</h3>
-                    <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+                    <p className="text-gray-700 leading-relaxed whitespace-pre-line break-words">
                       {event.full_description}
                     </p>
                   </div>

@@ -16,6 +16,7 @@ import {
   Globe,
   AlertCircle,
   CheckCircle,
+  X,
   Image,
   DollarSign,
   Languages,
@@ -40,6 +41,8 @@ export default function CreateEventPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({})
   const [timeoutId, setTimeoutId] = useState<NodeJS.Timeout | null>(null)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -184,33 +187,71 @@ export default function CreateEventPage() {
     getSession()
   }, [router])
 
+  const validateField = (name: string, value: any): string => {
+    switch (name) {
+      case 'title':
+        if (!value || !value.trim()) return 'Event title is required'
+        if (value.trim().length < 3) return 'Title must be at least 3 characters'
+        return ''
+      case 'event_type':
+        if (!value || !value.trim()) return 'Event type is required'
+        return ''
+      case 'start_date':
+        if (!value) return 'Start date is required'
+        if (formData.end_date && new Date(value) >= new Date(formData.end_date)) {
+          return 'Start date must be before end date'
+        }
+        return ''
+      case 'end_date':
+        if (!value) return 'End date is required'
+        if (formData.start_date && new Date(formData.start_date) >= new Date(value)) {
+          return 'End date must be after start date'
+        }
+        return ''
+      case 'group_size':
+        if (value < 1) return 'Group size must be at least 1'
+        if (value > 1000) return 'Group size cannot exceed 1000'
+        return ''
+      case 'participation_fee_reason':
+        if (formData.participation_fee && parseFloat(formData.participation_fee.toString()) > 0) {
+          if (!value || !value.trim()) return 'Participation fee reason is required when a fee is set'
+        }
+        return ''
+      default:
+        return ''
+    }
+  }
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target
+    setTouchedFields(prev => ({ ...prev, [name]: true }))
+    const error = validateField(name, value)
+    setFieldErrors(prev => ({ ...prev, [name]: error }))
+  }
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
     
     setFormData(prev => {
+      let newValue: any
       if (type === 'checkbox') {
         const checked = (e.target as HTMLInputElement).checked
-        return {
-          ...prev,
-          [name]: checked
-        }
+        newValue = checked
+      } else if (name === 'group_size') {
+        newValue = parseInt(value) || 1
+      } else if (name === 'participation_fee') {
+        newValue = value
+      } else {
+        newValue = value
       }
-      if (name === 'group_size') {
-        return {
-          ...prev,
-          [name]: parseInt(value) || 1
-        }
+      
+      // Validate field in real-time if it's been touched
+      if (touchedFields[name]) {
+        const error = validateField(name, newValue)
+        setFieldErrors(prev => ({ ...prev, [name]: error }))
       }
-      if (name === 'participation_fee') {
-        return {
-          ...prev,
-          [name]: value
-        }
-      }
-      return {
-        ...prev,
-        [name]: value
-      }
+      
+      return { ...prev, [name]: newValue }
     })
   }
 
@@ -242,6 +283,16 @@ export default function CreateEventPage() {
       }
     }
   }, [imagePreview])
+
+  // Auto-dismiss success notification after 3 seconds
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => {
+        setSuccess('')
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [success])
 
 
   const handleTargetGroupChange = (group: string) => {
@@ -465,6 +516,7 @@ export default function CreateEventPage() {
 
       console.log('Event created successfully:', createdEvent)
       setSuccess('Event created successfully!')
+      console.log('Success notification should appear now')
       
       // Clear form
       setFormData({
@@ -490,10 +542,10 @@ export default function CreateEventPage() {
       setImageFile(null)
       setImagePreview(null)
 
-      // Redirect to event details after 2 seconds
+      // Redirect to event details after showing notification (give time to see it)
       setTimeout(() => {
         router.push(`/events/${createdEvent.id}`)
-      }, 2000)
+      }, 3500) // 3.5 seconds to see the notification before redirect
 
     } catch (error: any) {
       console.error('Event creation error:', error)
@@ -569,6 +621,25 @@ export default function CreateEventPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
+      {/* Success Toast Notification */}
+      {success && (
+        <div className="fixed top-4 right-4 left-4 sm:left-auto z-[9999] animate-slide-in max-w-md mx-auto sm:mx-0">
+          <div className="bg-green-50 border border-green-200 text-green-800 rounded-lg shadow-lg p-4 flex items-start gap-3">
+            <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium">{success}</p>
+            </div>
+            <button
+              onClick={() => setSuccess('')}
+              className="text-green-600 hover:text-green-800 transition-colors flex-shrink-0 p-1 rounded hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+              aria-label="Close notification"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
@@ -605,10 +676,25 @@ export default function CreateEventPage() {
                   name="title"
                   value={formData.title}
                   onChange={handleInputChange}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onBlur={handleBlur}
+                  className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                    touchedFields.title && fieldErrors.title
+                      ? 'border-red-300 focus:ring-red-500'
+                      : touchedFields.title && !fieldErrors.title
+                      ? 'border-green-300 focus:ring-green-500'
+                      : 'border-gray-300'
+                  }`}
                   placeholder="Enter event title"
                   required
+                  aria-label="Event title"
+                  aria-invalid={touchedFields.title && !!fieldErrors.title}
+                  aria-describedby={touchedFields.title && fieldErrors.title ? 'title-error' : undefined}
                 />
+                {touchedFields.title && fieldErrors.title && (
+                  <p id="title-error" className="mt-1 text-sm text-red-600 flex items-center gap-1" role="alert">
+                    <span>{fieldErrors.title}</span>
+                  </p>
+                )}
               </div>
             </div>
 
@@ -945,14 +1031,6 @@ export default function CreateEventPage() {
               </div>
             )}
 
-            {success && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <div className="flex items-center">
-                  <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
-                  <p className="text-green-700 text-sm">{success}</p>
-                </div>
-              </div>
-            )}
 
             {/* Submit Button */}
             <div className="flex justify-end space-x-4">

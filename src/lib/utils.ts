@@ -46,4 +46,21 @@ export function isValidDate(date: string): boolean {
   return d instanceof Date && !isNaN(d.getTime());
 }
 
+/**
+ * Format a name-like string so each word starts with a capital letter
+ * and remaining characters are lowercase.
+ * @param value - The string to format
+ * @returns Formatted string or null if input is empty
+ */
+export function formatNameField(value?: string | null): string | null {
+  if (value === null || value === undefined) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  return trimmed
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
 

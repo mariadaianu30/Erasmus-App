@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Mail, Lock, Eye, EyeOff, User, ArrowRight, Users, UserCheck, Flag, MapPin, Briefcase, Languages, Calendar } from 'lucide-react'
 import { countries } from '@/lib/countries'
+import { formatNameField } from '@/lib/utils'
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true)
@@ -232,11 +233,15 @@ export default function AuthPage() {
         }
       }
 
+      const formattedFirstName = formatNameField(formData.firstName) || ''
+      const formattedLastName = formatNameField(formData.lastName) || ''
+      const formattedOrgName = formatNameField(formData.organizationName) || ''
+
       const participantProfileDefaults =
         formData.userType === 'participant'
           ? {
-              first_name: formData.firstName.trim(),
-              last_name: formData.lastName.trim(),
+              first_name: formattedFirstName,
+              last_name: formattedLastName,
               email: formData.email,
               birth_date: formData.birth_date || null,
               location: formData.location.trim(),
@@ -255,16 +260,16 @@ export default function AuthPage() {
           : null
 
       const metadata: Record<string, any> = {
-        first_name: formData.firstName.trim(),
-        last_name: formData.lastName.trim(),
+        first_name: formattedFirstName,
+        last_name: formattedLastName,
         user_type: formData.userType,
-        organization_name: formData.organizationName?.trim() || null,
+        organization_name: formattedOrgName || null,
         birth_date: formData.birth_date || null,
         participant_profile_defaults: participantProfileDefaults,
         organization_profile_defaults:
           formData.userType === 'organization'
             ? {
-                organization_name: formData.organizationName?.trim() || '',
+                organization_name: formattedOrgName || '',
                 email: formData.email,
                 location: formData.location.trim(),
               }
@@ -307,8 +312,8 @@ export default function AuthPage() {
           const profileData: any = {
             id: authData.user.id,
             user_type: 'participant',
-            first_name: formData.firstName.trim(),
-            last_name: formData.lastName.trim(),
+            first_name: formattedFirstName,
+            last_name: formattedLastName,
             email: formData.email,
             birth_date: formData.birth_date || null,
             location: formData.location.trim(),
@@ -334,7 +339,7 @@ export default function AuthPage() {
           const organizationProfile = {
             id: authData.user.id,
             user_type: 'organization',
-            organization_name: formData.organizationName?.trim() || '',
+            organization_name: formattedOrgName || '',
             email: formData.email,
             location: formData.location.trim(),
           }

@@ -5,8 +5,15 @@ import Link from 'next/link'
 import { Building, MapPin, Globe, Calendar, Search, Users, Award } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
+const slugifyOrganizationName = (name: string) =>
+  name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
 interface Organization {
-  id: string
+  id?: string
   organization_name: string
   organization_website: string | null
   location: string | null
@@ -131,6 +138,7 @@ export default function OrganizationsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredOrganizations.map((org) => {
               const website = org.organization_website ?? org.website ?? undefined
+              const organizationIdentifier = org.id ?? slugifyOrganizationName(org.organization_name)
               return (
                 <div key={org.id} className="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow">
                   <div className="p-6">
@@ -185,7 +193,7 @@ export default function OrganizationsPage() {
                   </div>
                   
                   <Link
-                    href={`/organizations/${org.organization_name.toLowerCase().replace(/\s+/g, '-')}`}
+                    href={`/organizations/${organizationIdentifier}`}
                     className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors text-center block"
                   >
                     View Organization
