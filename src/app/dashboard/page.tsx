@@ -1237,7 +1237,7 @@ export default function DashboardPage() {
                         {application.status === 'accepted' && (
                           <div className="bg-green-50 border border-green-200 rounded p-2 mt-2">
                             <p className="text-xs text-green-800 font-medium">
-                              🎉 Congratulations! You've been accepted to this event.
+                              🎉 Congratulations! You&apos;ve been accepted to this event.
                             </p>
                           </div>
                         )}

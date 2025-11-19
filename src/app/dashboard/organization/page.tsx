@@ -1340,7 +1340,7 @@ export default function OrganizationDashboard() {
                         <h4 className="text-sm font-medium text-gray-500 mb-1">Age</h4>
                         <p className="text-gray-900">
                           {participantProfile.birth_date || participantProfile.birthdate
-                            ? calculateAge(participantProfile.birth_date || participantProfile.birthdate) + ' years old'
+                            ? calculateAge((participantProfile.birth_date || participantProfile.birthdate) as string) + ' years old'
                             : 'Not specified'}
                         </p>
                       </div>
