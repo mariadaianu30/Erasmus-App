@@ -117,6 +117,7 @@ export default function OrganizationDashboard() {
 
   useEffect(() => {
     getSession()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {

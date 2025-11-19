@@ -15,6 +15,7 @@ import {
   AlertCircle,
   CheckCircle,
   X,
+  Image,
   DollarSign,
   Languages,
   UtensilsCrossed,
@@ -846,7 +847,7 @@ export default function CreateEventPage() {
             {/* 8. Event cover image */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Image className="h-4 w-4 inline mr-2" />
+                <Image className="h-4 w-4 inline mr-2" aria-hidden="true" />
                 Event Cover Image (PNG)
               </label>
               <div className="flex flex-col gap-3">
