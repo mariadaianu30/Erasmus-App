@@ -1327,8 +1327,8 @@ export default function OrganizationDashboard() {
                       <div>
                         <h4 className="text-sm font-medium text-gray-500 mb-1">Birth Date</h4>
                         <p className="text-gray-900">
-                          {participantProfile.birth_date || participantProfile.birthdate
-                            ? new Date(participantProfile.birth_date || participantProfile.birthdate).toLocaleDateString('en-US', {
+                          {(participantProfile.birth_date || participantProfile.birthdate)
+                            ? new Date((participantProfile.birth_date || participantProfile.birthdate) as string).toLocaleDateString('en-US', {
                                 year: 'numeric',
                                 month: 'long',
                                 day: 'numeric'
