@@ -211,8 +211,6 @@ export default function EditEventPage() {
           transport_details: event.transport_details || '',
         })
         setExistingPhotoUrl(event.photo_url || null)
-        setExistingDescription(event.description || null)
-        console.log('Edit page - Form populated, existing description:', event.description)
         console.log('Edit page - Form populated, setting loading to false')
       } catch (err) {
         console.error(err)
