@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
@@ -182,7 +182,7 @@ export default function CreateEventPage() {
     getSession()
   }, [router])
 
-  const validateField = (name: string, value: any): string => {
+  const validateField = useCallback((name: string, value: any): string => {
     switch (name) {
       case 'title':
         if (!value || !value.trim()) return 'Event title is required'
@@ -217,7 +217,7 @@ export default function CreateEventPage() {
       default:
         return ''
     }
-  }
+  }, [formData.start_date, formData.end_date, formData.participation_fee])
 
   const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -317,7 +317,7 @@ export default function CreateEventPage() {
       const error = validateField('participation_fee_reason', formData.participation_fee_reason)
       setFieldErrors(prev => ({ ...prev, participation_fee_reason: error }))
     }
-  }, [formData.participation_fee, touchedFields.participation_fee_reason])
+  }, [formData.participation_fee, formData.participation_fee_reason, touchedFields.participation_fee_reason, validateField])
 
   const handleTargetGroupChange = (group: string) => {
     setFormData(prev => {
@@ -1056,6 +1056,7 @@ export default function CreateEventPage() {
                 {(imagePreview || formData.photo_url) && (
                   <div className="relative">
                     <div className="relative w-full h-[300px] sm:h-[400px] rounded-lg overflow-hidden border-2 border-gray-200 shadow-sm">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={imagePreview || formData.photo_url || undefined}
                         alt="Event preview"
@@ -1374,6 +1375,7 @@ export default function CreateEventPage() {
               
               {(imagePreview || formData.photo_url) && (
                 <div className="mb-4">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={imagePreview || formData.photo_url || undefined}
                     alt="Event photo"

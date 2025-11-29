@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
@@ -23,6 +23,7 @@ import {
   Edit,
   Trash2
 } from 'lucide-react'
+import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/lib/utils'
 import { downloadCsvFile, participantToCsvRow, PARTICIPANT_CSV_HEADERS, ParticipantProfileForCsv } from '@/lib/csv'
@@ -95,10 +96,6 @@ export default function EventDetailsPage() {
   const [deletingEvent, setDeletingEvent] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
-  useEffect(() => {
-    fetchEvent()
-    checkUser()
-  }, [params.id])
 
   // Auto-dismiss toast after 3 seconds
   useEffect(() => {
@@ -146,7 +143,7 @@ export default function EventDetailsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [event?.id, event?.organization_id, event?.organization_name, user?.id, userProfile?.user_type, userProfile?.organization_name, loading])
 
-  const fetchEvent = async () => {
+  const fetchEvent = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('events')
@@ -183,9 +180,9 @@ export default function EventDetailsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [params.id, router])
 
-  const checkUser = async () => {
+  const checkUser = useCallback(async () => {
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser()
       
@@ -227,7 +224,12 @@ export default function EventDetailsPage() {
     } catch (error) {
       console.error('Error checking user:', error)
     }
-  }
+  }, [params.id])
+
+  useEffect(() => {
+    fetchEvent()
+    checkUser()
+  }, [fetchEvent, checkUser])
 
   const handleApply = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -611,10 +613,12 @@ export default function EventDetailsPage() {
               {/* Event Photo - Hero Image */}
               {event.photo_url && (
                 <div className="relative w-full h-[280px] sm:h-[360px] lg:h-[420px] overflow-hidden bg-gray-100">
-                  <img 
+                  <Image 
                     src={event.photo_url} 
                     alt={event.title}
-                    className="w-full h-full object-cover"
+                    fill
+                    className="object-cover"
+                    unoptimized
                   />
                 </div>
               )}

@@ -200,6 +200,7 @@ const DraggableGallery = () => {
             whileHover={{ scale: 1.02, zIndex: 20 }}
             transition={{ duration: 0.3 }}
           >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={image}
               alt={`Gallery image ${index + 1}`}

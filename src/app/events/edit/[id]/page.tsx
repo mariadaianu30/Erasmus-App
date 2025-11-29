@@ -778,6 +778,7 @@ export default function EditEventPage() {
                 {(imagePreview || existingPhotoUrl) && (
                   <div className="relative">
                     <div className="relative w-full h-[300px] sm:h-[400px] rounded-lg overflow-hidden border-2 border-gray-200 shadow-sm">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={imagePreview || existingPhotoUrl || ''}
                         alt="Event preview"

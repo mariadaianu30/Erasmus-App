@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Calendar, MapPin, Users, Clock, Search, Filter, X, SlidersHorizontal } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { EventCardSkeleton } from '@/components/SkeletonLoader'
@@ -318,11 +319,12 @@ export default function EventsPage() {
               <div key={event.id} className="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow overflow-hidden flex flex-col">
                 {event.photo_url ? (
                   <div className="relative h-48 w-full">
-                    <img
+                    <Image
                       src={event.photo_url}
                       alt={`${event.title} cover`}
-                      className="h-full w-full object-cover"
-                      loading="lazy"
+                      fill
+                      className="object-cover"
+                      unoptimized
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none'
                       }}

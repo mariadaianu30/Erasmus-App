@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Calendar, MapPin, Users, Tag, Mail, Clock, ArrowLeft } from 'lucide-react'
@@ -32,12 +32,7 @@ export default function ProjectDetailPage() {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
 
-  useEffect(() => {
-    checkUser()
-    fetchProject()
-  }, [params.id])
-
-  const checkUser = async () => {
+  const checkUser = useCallback(async () => {
     const { data: { user: currentUser } } = await supabase.auth.getUser()
     if (currentUser) {
       setUser(currentUser)
@@ -48,9 +43,9 @@ export default function ProjectDetailPage() {
         .single()
       setProfile(profileData)
     }
-  }
+  }, [])
 
-  const fetchProject = async () => {
+  const fetchProject = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('projects')
@@ -65,7 +60,12 @@ export default function ProjectDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [params.id])
+
+  useEffect(() => {
+    checkUser()
+    fetchProject()
+  }, [checkUser, fetchProject])
 
   const handleContactPartner = async () => {
     if (!user || !profile || !project) {
