@@ -328,7 +328,7 @@ export default function DashboardPage() {
           .filter(Boolean)
       )]
       
-      let organizationMap: Record<string, string> = {}
+      const organizationMap: Record<string, string> = {}
       
       if (organizationIds.length > 0) {
         const { data: profiles } = await supabase

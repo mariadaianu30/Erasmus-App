@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Building, MapPin, Globe, Search, Users, Award, X, SlidersHorizontal } from 'lucide-react'
+import { Building, MapPin, Globe, Search, Users, Award, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 const slugifyOrganizationName = (name: string) =>

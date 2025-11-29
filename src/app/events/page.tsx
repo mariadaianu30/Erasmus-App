@@ -53,7 +53,7 @@ export default function EventsPage() {
       // Fetch organization names for all unique organization IDs
       const organizationIds = [...new Set((data || []).map((event: any) => event.organization_id).filter(Boolean))]
       
-      let organizationMap: Record<string, { name: string | null; website: string | null }> = {}
+      const organizationMap: Record<string, { name: string | null; website: string | null }> = {}
       
       if (organizationIds.length > 0) {
         const { data: profiles } = await supabase

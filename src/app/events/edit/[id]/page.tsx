@@ -61,7 +61,7 @@ interface EventFormState {
   is_funded: boolean
   is_published: boolean
   target_groups: string[]
-  group_size: number
+  group_size: number | string
   working_language: string
   participation_fee: string
   participation_fee_reason: string
@@ -756,6 +756,7 @@ export default function EditEventPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
+                {/* eslint-disable-next-line jsx-a11y/alt-text */}
                 <Image className="h-4 w-4 inline mr-2" aria-hidden="true" />
                 Event Cover Image (PNG)
               </label>

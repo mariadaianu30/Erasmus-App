@@ -23,7 +23,7 @@ export default function CreateProjectPage() {
     begin_date: '',
     end_date: '',
     deadline_for_partner_request: '',
-    number_of_partners_needed: 1,
+    number_of_partners_needed: 1 as number | string,
     short_description: '',
     full_description: '',
     project_type: '',

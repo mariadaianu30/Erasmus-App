@@ -292,7 +292,7 @@ export default function MyApplicationsPage() {
                             <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
                             <div>
                               <p className="text-sm font-medium text-green-800">
-                                🎉 Congratulations! You've been accepted to this event.
+                                🎉 Congratulations! You&apos;ve been accepted to this event.
                               </p>
                               <p className="text-xs text-green-700 mt-1">
                                 The organization will contact you with further details.

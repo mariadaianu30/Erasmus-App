@@ -1016,7 +1016,7 @@ export default function EventDetailsPage() {
                         required
                       />
                       <p className="text-xs text-gray-500 mt-2">
-                        Write a brief motivation letter explaining your interest and why you're a good fit for this event
+                        Write a brief motivation letter explaining your interest and why you&apos;re a good fit for this event
                       </p>
                     </div>
 

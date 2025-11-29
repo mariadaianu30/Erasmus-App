@@ -172,7 +172,7 @@ export default function CreateEventPage() {
         }
 
         setProfile(profileData)
-      } catch (error) {
+      } catch {
         router.push('/auth')
       } finally {
         setLoading(false)
@@ -1034,6 +1034,7 @@ export default function CreateEventPage() {
             {/* 8. Event cover image */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
+                {/* eslint-disable-next-line jsx-a11y/alt-text */}
                 <Image className="h-4 w-4 inline mr-2" aria-hidden="true" />
                 Event Cover Image (PNG)
               </label>
@@ -1117,7 +1118,7 @@ export default function CreateEventPage() {
                   type="number"
                   id="group_size"
                   name="group_size"
-                  value={formData.group_size === '' ? '' : formData.group_size}
+                  value={typeof formData.group_size === 'string' && formData.group_size === '' ? '' : String(formData.group_size || '')}
                   onChange={handleInputChange}
                   onBlur={(e) => {
                     // On blur, if empty, set to default value of 1
