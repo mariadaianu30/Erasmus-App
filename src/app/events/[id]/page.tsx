@@ -155,6 +155,27 @@ export default function EventDetailsPage() {
         .single()
 
       if (error) throw error
+      
+      if (!data) {
+        router.push('/events')
+        return
+      }
+      
+      // Fetch organization name if organization_id exists
+      if (data.organization_id) {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('organization_name, website')
+          .eq('id', data.organization_id)
+          .single()
+        
+        // Handle profile fetch errors gracefully (profile might not exist)
+        if (!profileError && profile) {
+          data.organization_name = profile.organization_name || null
+          data.organization_website = profile.website || null
+        }
+      }
+      
       setEvent(data)
     } catch (error) {
       console.error('Error fetching event:', error)
@@ -165,30 +186,46 @@ export default function EventDetailsPage() {
   }
 
   const checkUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    setUser(user)
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      
+      if (userError) {
+        console.error('Error getting user:', userError)
+        return
+      }
+      
+      setUser(user)
 
-    if (user) {
-      // Fetch user profile to check user type
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('user_type, organization_name')
-        .eq('id', user.id)
-        .single()
-
-      setUserProfile(profile)
-
-      // Only check applications for participants
-      if (profile?.user_type === 'participant') {
-        const { data: application } = await supabase
-          .from('applications')
-          .select('*')
-          .eq('event_id', params.id)
-          .eq('participant_id', user.id)
+      if (user) {
+        // Fetch user profile to check user type
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('user_type, organization_name')
+          .eq('id', user.id)
           .single()
 
-        setApplication(application)
+        // Handle profile fetch errors gracefully (profile might not exist yet)
+        if (!profileError && profile) {
+          setUserProfile(profile)
+
+          // Only check applications for participants
+          if (profile.user_type === 'participant') {
+            const { data: application, error: applicationError } = await supabase
+              .from('applications')
+              .select('*')
+              .eq('event_id', params.id)
+              .eq('participant_id', user.id)
+              .single()
+
+            // Handle application fetch errors gracefully (application might not exist)
+            if (!applicationError && application) {
+              setApplication(application)
+            }
+          }
+        }
       }
+    } catch (error) {
+      console.error('Error checking user:', error)
     }
   }
 
@@ -213,11 +250,6 @@ export default function EventDetailsPage() {
     })
 
     try {
-      console.log('Starting application submission...')
-      console.log('Event ID:', event.id)
-      console.log('User ID:', user.id)
-      console.log('Motivation letter length:', motivationLetter.length)
-      
       const insertPromise = supabase
         .from('applications')
         .insert({
@@ -227,17 +259,13 @@ export default function EventDetailsPage() {
           status: 'pending'
         })
 
-      console.log('Insert promise created, racing with timeout...')
-      
       // Race between the actual request and timeout
-      const { error } = await Promise.race([
+      const result = await Promise.race([
         insertPromise,
         timeoutPromise
-      ]) as any
+      ]) as { error?: any; data?: any }
 
-      console.log('Promise race completed, error:', error)
-
-      if (error) throw error
+      if (result.error) throw result.error
 
       // Refresh application status
       await checkUser()
@@ -576,24 +604,38 @@ export default function EventDetailsPage() {
           Back to Events
         </Link>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="space-y-8">
           {/* Main Content */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow-sm border p-6">
-              {/* Event Header */}
-              <div className="mb-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h1 className="text-3xl font-bold text-gray-900 mb-2">{event.title}</h1>
-                    <div className="flex items-center text-blue-600 mb-4">
-                      <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                        {event.category}
-                      </span>
+          <div>
+            <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+              {/* Event Photo - Hero Image */}
+              {event.photo_url && (
+                <div className="relative w-full h-[280px] sm:h-[360px] lg:h-[420px] overflow-hidden bg-gray-100">
+                  <img 
+                    src={event.photo_url} 
+                    alt={event.title}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
+              
+              <div className="p-6">
+                {/* Event Header */}
+                <div className="mb-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h1 className="text-3xl font-bold text-gray-900 mb-2">{event.title}</h1>
+                      {event.category && (
+                        <div className="flex items-center text-blue-600 mb-4">
+                          <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+                            {event.category}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
-                </div>
 
-                {canManageEvent && (
+                  {canManageEvent && (
                   <>
                     <div className="flex flex-wrap gap-3 mb-4">
                       <button
@@ -647,7 +689,8 @@ export default function EventDetailsPage() {
                       </button>
                     </div>
                   </>
-                )}
+                  )}
+                </div>
 
                 {/* Event Details - Restructured */}
                 <div className="space-y-4 mb-6">
@@ -726,17 +769,6 @@ export default function EventDetailsPage() {
                     </div>
                   )}
                 </div>
-
-                {/* Photo */}
-                {event.photo_url && (
-                  <div className="mb-6">
-                    <img 
-                      src={event.photo_url} 
-                      alt={event.title}
-                      className="w-full h-64 object-cover rounded-lg"
-                    />
-                  </div>
-                )}
 
                 {/* 9. Funded (Yes / No) */}
                 {event.is_funded && (
@@ -819,7 +851,7 @@ export default function EventDetailsPage() {
                       </h4>
                       <div className="space-y-2">
                         <p className="text-gray-700">
-                          <span className="font-medium">Amount:</span> ${event.participation_fee.toFixed(2)}
+                          <span className="font-medium">Amount:</span> ${typeof event.participation_fee === 'number' ? event.participation_fee.toFixed(2) : '0.00'}
                         </p>
                         {event.participation_fee_reason && (
                           <p className="text-gray-600 text-sm">
@@ -860,35 +892,32 @@ export default function EventDetailsPage() {
             </div>
           </div>
 
-          {/* Sidebar */}
-          <div className="lg:col-span-1">
-            <div className="sticky top-8">
-              {/* Organization Info */}
-              <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Organized By</h3>
-                <div className="flex items-start space-x-3">
-                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                    <User className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-medium text-gray-900">{event.organization_name}</h4>
-                    {event.organization_website && (
-                      <a 
-                        href={event.organization_website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center text-sm text-blue-600 hover:text-blue-700 mt-1"
-                      >
-                        <Globe className="h-4 w-4 mr-1" />
-                        Visit Website
-                      </a>
-                    )}
-                  </div>
-                </div>
+          {/* Organization Info */}
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Organized By</h3>
+            <div className="flex items-start space-x-3">
+              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                <User className="h-6 w-6 text-blue-600" />
               </div>
+              <div className="flex-1">
+                <h4 className="font-medium text-gray-900">{event.organization_name}</h4>
+                {event.organization_website && (
+                  <a 
+                    href={event.organization_website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center text-sm text-blue-600 hover:text-blue-700 mt-1"
+                  >
+                    <Globe className="h-4 w-4 mr-1" />
+                    Visit Website
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
 
-              {/* Application Section */}
-              <div className="bg-white rounded-lg shadow-sm border p-6">
+          {/* Application Section */}
+          <div className="bg-white rounded-lg shadow-sm border p-6">
                 {!user ? (
                   <div className="text-center">
                     <h3 className="text-lg font-semibold text-gray-900 mb-3">Apply to This Event</h3>
@@ -965,43 +994,44 @@ export default function EventDetailsPage() {
                     </Link>
                   </div>
                 ) : showApplyForm ? (
-                  <form onSubmit={handleApply} className="space-y-4">
-                    <div className="text-center mb-4">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Apply to This Event</h3>
+                  <form onSubmit={handleApply} className="space-y-6">
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-900 mb-2">Apply to This Event</h3>
                       <p className="text-sm text-gray-600">
-                        Write a motivation letter explaining why you want to participate
+                        Write a motivation letter explaining why you want to participate in this event
                       </p>
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="motivation-letter" className="block text-sm font-medium text-gray-700 mb-2">
                         Motivation Letter *
                       </label>
                       <textarea
+                        id="motivation-letter"
                         value={motivationLetter}
                         onChange={(e) => setMotivationLetter(e.target.value)}
-                        rows={6}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        rows={8}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y transition-colors"
                         placeholder="I am very interested in this opportunity because..."
                         required
                       />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Write a brief motivation letter explaining your interest
+                      <p className="text-xs text-gray-500 mt-2">
+                        Write a brief motivation letter explaining your interest and why you're a good fit for this event
                       </p>
                     </div>
 
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                       <p className="text-sm text-blue-800">
                         💡 <strong>Tip:</strong> Mention your relevant experience, what you hope to learn, 
                         and how this opportunity aligns with your goals.
                       </p>
                     </div>
                     
-                    <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="flex flex-col sm:flex-row gap-3 pt-2">
                       <button
                         type="submit"
                         disabled={applying || motivationLetter.trim().length === 0}
-                        className="flex-1 bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-h-[48px]"
+                        className="flex-1 bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-h-[48px]"
                       >
                         {applying ? (
                           <>
@@ -1036,8 +1066,6 @@ export default function EventDetailsPage() {
                     </button>
                   </div>
                 )}
-              </div>
-            </div>
           </div>
         </div>
       </div>

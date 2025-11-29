@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Calendar, MapPin, Users, Clock, Search, Filter } from 'lucide-react'
+import { Calendar, MapPin, Users, Clock, Search, Filter, X, SlidersHorizontal } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { EventCardSkeleton } from '@/components/SkeletonLoader'
 
@@ -27,6 +27,8 @@ export default function EventsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
   const [categories, setCategories] = useState<string[]>([])
+  const [showFilters, setShowFilters] = useState(false)
+  const [locationFilter, setLocationFilter] = useState('')
 
   useEffect(() => {
     fetchEvents()
@@ -48,10 +50,38 @@ export default function EventsPage() {
         return
       }
 
-      setEvents(data || [])
+      // Fetch organization names for all unique organization IDs
+      const organizationIds = [...new Set((data || []).map((event: any) => event.organization_id).filter(Boolean))]
+      
+      let organizationMap: Record<string, { name: string | null; website: string | null }> = {}
+      
+      if (organizationIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, organization_name, website')
+          .in('id', organizationIds)
+        
+        if (profiles) {
+          profiles.forEach((profile: any) => {
+            organizationMap[profile.id] = {
+              name: profile.organization_name || null,
+              website: profile.website || null
+            }
+          })
+        }
+      }
+
+      // Map events with organization names
+      const eventsWithOrgName = (data || []).map((event: any) => ({
+        ...event,
+        organization_name: event.organization_id ? (organizationMap[event.organization_id]?.name || null) : null,
+        organization_website: event.organization_id ? (organizationMap[event.organization_id]?.website || null) : null
+      }))
+
+      setEvents(eventsWithOrgName)
       
       // Extract unique categories
-      const uniqueCategories = [...new Set(data?.map(event => event.category) || [])]
+      const uniqueCategories = [...new Set(eventsWithOrgName.map((event: Event) => event.category) || [])]
       setCategories(uniqueCategories)
     } catch (error) {
       console.log('Events fetch error (non-critical):', error)
@@ -63,12 +93,29 @@ export default function EventsPage() {
   }
 
   const filteredEvents = events.filter(event => {
-    const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         event.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         event.location.toLowerCase().includes(searchTerm.toLowerCase())
+    const query = searchTerm.toLowerCase()
+    const matchesSearch = !query || 
+      event.title.toLowerCase().includes(query) ||
+      event.description.toLowerCase().includes(query) ||
+      event.location.toLowerCase().includes(query) ||
+      event.organization_name?.toLowerCase().includes(query)
+    
     const matchesCategory = !selectedCategory || event.category === selectedCategory
-    return matchesSearch && matchesCategory
+    
+    const matchesLocation = !locationFilter || 
+      event.location.toLowerCase().includes(locationFilter.toLowerCase())
+    
+    return matchesSearch && matchesCategory && matchesLocation
   })
+
+  const clearFilters = () => {
+    setSearchTerm('')
+    setSelectedCategory('')
+    setLocationFilter('')
+    setShowFilters(false)
+  }
+
+  const hasActiveFilters = searchTerm || selectedCategory || locationFilter
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -122,36 +169,134 @@ export default function EventsPage() {
 
         {/* Search and Filter */}
         <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6 mb-8">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
-              <label htmlFor="search-events" className="sr-only">Search events</label>
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" aria-hidden="true" />
-              <input
-                id="search-events"
-                type="text"
-                placeholder="Search opportunities by title, description, or location..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                aria-label="Search events"
-              />
+          <div className="space-y-4">
+            {/* Main Search Bar */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex-1 relative">
+                <label htmlFor="search-events" className="sr-only">Search events</label>
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5 pointer-events-none" aria-hidden="true" />
+                <input
+                  id="search-events"
+                  type="text"
+                  placeholder="Search by title, description, location, or organization..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                  aria-label="Search events"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    aria-label="Clear search"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`flex items-center gap-2 px-4 py-3 border rounded-lg transition-colors ${
+                    showFilters || hasActiveFilters
+                      ? 'bg-blue-50 border-blue-300 text-blue-700'
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                  aria-label="Toggle filters"
+                >
+                  <SlidersHorizontal className="h-5 w-5" />
+                  <span className="hidden sm:inline">Filters</span>
+                  {hasActiveFilters && (
+                    <span className="bg-blue-600 text-white text-xs rounded-full px-2 py-0.5">
+                      {[searchTerm, selectedCategory, locationFilter].filter(Boolean).length}
+                    </span>
+                  )}
+                </button>
+                {hasActiveFilters && (
+                  <button
+                    onClick={clearFilters}
+                    className="flex items-center gap-2 px-4 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                    aria-label="Clear all filters"
+                  >
+                    <X className="h-5 w-5" />
+                    <span className="hidden sm:inline">Clear</span>
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Filter className="h-5 w-5 text-gray-400" aria-hidden="true" />
-              <label htmlFor="filter-category" className="sr-only">Filter by category</label>
-              <select
-                id="filter-category"
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full md:w-auto"
-                aria-label="Filter by category"
-              >
-                <option value="">All Categories</option>
-                {categories.map(category => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
-              </select>
-            </div>
+
+            {/* Advanced Filters */}
+            {showFilters && (
+              <div className="pt-4 border-t border-gray-200 animate-in slide-in-from-top-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="filter-category" className="block text-sm font-medium text-gray-700 mb-2">
+                      Category
+                    </label>
+                    <div className="relative">
+                      <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                      <select
+                        id="filter-category"
+                        value={selectedCategory}
+                        onChange={(e) => setSelectedCategory(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                      >
+                        <option value="">All Categories</option>
+                        {categories.map(category => (
+                          <option key={category} value={category}>{category}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="filter-location" className="block text-sm font-medium text-gray-700 mb-2">
+                      Location
+                    </label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                      <input
+                        id="filter-location"
+                        type="text"
+                        placeholder="Filter by location..."
+                        value={locationFilter}
+                        onChange={(e) => setLocationFilter(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Active Filters Display */}
+            {hasActiveFilters && !showFilters && (
+              <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200">
+                {searchTerm && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                    Search: {searchTerm}
+                    <button onClick={() => setSearchTerm('')} className="hover:text-blue-900">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                )}
+                {selectedCategory && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                    Category: {selectedCategory}
+                    <button onClick={() => setSelectedCategory('')} className="hover:text-blue-900">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                )}
+                {locationFilter && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                    Location: {locationFilter}
+                    <button onClick={() => setLocationFilter('')} className="hover:text-blue-900">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -218,9 +363,11 @@ export default function EventsPage() {
                     </div>
                   </div>
                   
-                  <div className="text-sm text-gray-600 mb-4">
-                    by <span className="font-medium">{event.organization_name || 'Erasmus+ Connect'}</span>
-                  </div>
+                  {event.organization_name && (
+                    <div className="text-sm text-gray-600 mb-4">
+                      by <span className="font-medium">{event.organization_name}</span>
+                    </div>
+                  )}
                   
                   <Link
                     href={`/events/${event.id}`}
@@ -236,11 +383,26 @@ export default function EventsPage() {
         )}
 
         {/* Results count */}
-        {filteredEvents.length > 0 && (
-          <div className="text-center mt-8 text-gray-500">
-            Showing {filteredEvents.length} of {events.length} opportunities
-          </div>
-        )}
+        <div className="text-center mt-8">
+          <p className="text-gray-600 font-medium">
+            {filteredEvents.length === 0 ? (
+              <span>No opportunities found</span>
+            ) : (
+              <span>
+                Showing <span className="text-blue-600 font-semibold">{filteredEvents.length}</span> of{' '}
+                <span className="text-gray-900 font-semibold">{events.length}</span> opportunities
+                {hasActiveFilters && (
+                  <button
+                    onClick={clearFilters}
+                    className="ml-2 text-blue-600 hover:text-blue-700 underline text-sm"
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </span>
+            )}
+          </p>
+        </div>
       </div>
     </div>
   )

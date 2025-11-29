@@ -18,6 +18,7 @@ export default function CreateProjectPage() {
 
   const [formData, setFormData] = useState({
     project_title: '',
+    project_email: '',
     searching_partners_countries: [] as string[],
     begin_date: '',
     end_date: '',
@@ -45,7 +46,7 @@ export default function CreateProjectPage() {
     setUser(currentUser)
     const { data: profileData } = await supabase
       .from('profiles')
-      .select('user_type, organization_name')
+      .select('user_type, organization_name, email')
       .eq('id', currentUser.id)
       .single()
 
@@ -55,13 +56,41 @@ export default function CreateProjectPage() {
     }
 
     setProfile(profileData)
+    // Set default project_email to organization's email
+    if (profileData.email) {
+      setFormData(prev => ({ ...prev, project_email: profileData.email }))
+    }
     setLoading(false)
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     if (name === 'number_of_partners_needed') {
-      setFormData(prev => ({ ...prev, [name]: parseInt(value) || 1 }))
+      // Allow empty string for proper typing, only parse when there's a value
+      if (value === '') {
+        setFormData(prev => ({ ...prev, [name]: '' }))
+      } else {
+        const parsed = parseInt(value)
+        setFormData(prev => ({ ...prev, [name]: isNaN(parsed) ? '' : parsed }))
+      }
+    } else if (name === 'begin_date') {
+      // Auto-set end_date to be 1 day after begin_date if end_date is empty or before begin_date
+      if (value) {
+        setFormData(prev => {
+          const beginDate = new Date(value)
+          const currentEndDate = prev.end_date ? new Date(prev.end_date) : null
+          if (!currentEndDate || currentEndDate <= beginDate) {
+            const suggestedEndDate = new Date(beginDate)
+            suggestedEndDate.setDate(suggestedEndDate.getDate() + 1)
+            // Format as date (YYYY-MM-DD)
+            const formattedEndDate = suggestedEndDate.toISOString().split('T')[0]
+            return { ...prev, [name]: value, end_date: formattedEndDate }
+          }
+          return { ...prev, [name]: value }
+        })
+      } else {
+        setFormData(prev => ({ ...prev, [name]: value }))
+      }
     } else {
       setFormData(prev => ({ ...prev, [name]: value }))
     }
@@ -105,7 +134,8 @@ export default function CreateProjectPage() {
       errors.push('End date must be after begin date')
     }
     if (!formData.deadline_for_partner_request) errors.push('Deadline for partner request is required')
-    if (formData.number_of_partners_needed < 1) errors.push('Number of partners must be at least 1')
+    const partnersNeeded = typeof formData.number_of_partners_needed === 'string' ? parseInt(formData.number_of_partners_needed) : formData.number_of_partners_needed
+    if (!partnersNeeded || partnersNeeded < 1) errors.push('Number of partners must be at least 1')
     return errors
   }
 
@@ -124,15 +154,51 @@ export default function CreateProjectPage() {
     setSuccess('')
 
     try {
+      // Verify user is authenticated and refresh session
+      const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser()
+      if (authError || !currentUser) {
+        setError('You are not logged in. Please log in and try again.')
+        setSaving(false)
+        return
+      }
+
+      // Refresh session to ensure auth token is valid
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError || !session) {
+        setError('Session expired. Please log in again.')
+        setSaving(false)
+        return
+      }
+
+      // Verify user profile exists and is an organization (helps with RLS)
+      const { data: userProfile, error: profileCheckError } = await supabase
+        .from('profiles')
+        .select('user_type, organization_name, email')
+        .eq('id', currentUser.id)
+        .single()
+
+      if (profileCheckError || !userProfile) {
+        setError('Profile not found. Please complete your profile setup first.')
+        setSaving(false)
+        return
+      }
+
+      if (userProfile.user_type !== 'organization') {
+        setError('Only organizations can create projects. Please log in with an organization account.')
+        setSaving(false)
+        return
+      }
+
       const projectData = {
         project_title: formData.project_title.trim(),
-        organization_id: user.id,
-        organization_name: profile.organization_name || 'Unknown Organization',
+        organization_id: currentUser.id,
+        organization_name: userProfile.organization_name || 'Unknown Organization',
+        project_email: formData.project_email.trim() || userProfile.email || null,
         searching_partners_countries: formData.searching_partners_countries,
         begin_date: formData.begin_date || null,
         end_date: formData.end_date || null,
         deadline_for_partner_request: formData.deadline_for_partner_request || null,
-        number_of_partners_needed: formData.number_of_partners_needed,
+        number_of_partners_needed: typeof formData.number_of_partners_needed === 'string' ? parseInt(formData.number_of_partners_needed) || 1 : formData.number_of_partners_needed,
         short_description: formData.short_description.trim() || null,
         full_description: formData.full_description.trim() || null,
         project_type: formData.project_type.trim() || null,
@@ -141,22 +207,66 @@ export default function CreateProjectPage() {
         is_published: true,
       }
 
+      console.log('=== PROJECT CREATION DEBUG ===')
+      console.log('User ID:', currentUser.id)
+      console.log('User email:', currentUser.email)
+      console.log('Session valid:', !!session)
+      console.log('Project data:', JSON.stringify(projectData, null, 2))
+      console.log('=============================')
+
+      // Insert with improved error handling
+      console.log('Starting database insert...')
+      const startTime = Date.now()
+
       const { data, error: insertError } = await supabase
         .from('projects')
         .insert(projectData)
         .select()
-        .single()
 
-      if (insertError) throw insertError
+      const endTime = Date.now()
+      console.log(`Insert completed in ${endTime - startTime}ms`)
+
+      if (insertError) {
+        console.error('Insert error:', insertError)
+        console.error('Error code:', insertError.code)
+        console.error('Error message:', insertError.message)
+        console.error('Error details:', insertError.details)
+        console.error('Error hint:', insertError.hint)
+
+        // Provide user-friendly error messages
+        if (insertError.code === '23514') {
+          setError(`Data validation error: ${insertError.message || 'Please check all required fields are filled correctly.'}`)
+        } else if (insertError.code === '42501' || insertError.message?.includes('permission') || insertError.message?.includes('policy')) {
+          setError('Permission denied. Please ensure you are logged in as an organization account and your profile is set up correctly.')
+        } else if (insertError.code === '23503') {
+          setError('Invalid organization ID. Please log out and log back in, then try again.')
+        } else if (insertError.message?.includes('timeout') || insertError.message?.includes('TIMEOUT')) {
+          setError('Request timed out. Please check your internet connection and try again.')
+        } else {
+          setError(`Failed to create project: ${insertError.message || 'Unknown error'}. Please check the browser console for details.`)
+        }
+        setSaving(false)
+        return
+      }
+
+      if (!data || data.length === 0) {
+        console.error('No data returned from insert')
+        setError('Project creation failed. No data returned from database.')
+        setSaving(false)
+        return
+      }
+
+      // Get the first (and should be only) item
+      const createdProject = data[0]
+      console.log('Project created successfully:', createdProject)
 
       setSuccess('Project created successfully!')
       setTimeout(() => {
-        router.push(`/projects/${data.id}`)
+        router.push(`/projects/${createdProject.id}`)
       }, 1500)
     } catch (error: any) {
       console.error('Project creation error:', error)
       setError(error.message || 'Failed to create project. Please try again.')
-    } finally {
       setSaving(false)
     }
   }
@@ -203,6 +313,24 @@ export default function CreateProjectPage() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Enter project title"
               />
+            </div>
+
+            {/* Project Email */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Project Contact Email
+              </label>
+              <input
+                type="email"
+                name="project_email"
+                value={formData.project_email}
+                onChange={handleInputChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Email for project inquiries (defaults to your organization email)"
+              />
+              <p className="mt-1 text-sm text-gray-500">
+                This email will be used by other organizations to contact you about this project. Defaults to your organization email.
+              </p>
             </div>
 
             {/* Searching Partners in Countries */}
@@ -260,9 +388,14 @@ export default function CreateProjectPage() {
                   value={formData.end_date}
                   onChange={handleInputChange}
                   required
-                  min={formData.begin_date}
+                  min={formData.begin_date || undefined}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
+                {formData.begin_date && formData.end_date && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    End date automatically set to 1 day after begin date. You can adjust it if needed.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -289,8 +422,19 @@ export default function CreateProjectPage() {
               <input
                 type="number"
                 name="number_of_partners_needed"
-                value={formData.number_of_partners_needed}
+                value={formData.number_of_partners_needed === '' ? '' : formData.number_of_partners_needed}
                 onChange={handleInputChange}
+                onBlur={(e) => {
+                  // On blur, if empty, set to default value of 1
+                  if (e.target.value === '' || parseInt(e.target.value) < 1) {
+                    setFormData(prev => ({ ...prev, number_of_partners_needed: 1 }))
+                  } else {
+                    const val = parseInt(e.target.value)
+                    if (!isNaN(val) && val >= 1) {
+                      setFormData(prev => ({ ...prev, number_of_partners_needed: val }))
+                    }
+                  }
+                }}
                 min="1"
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"

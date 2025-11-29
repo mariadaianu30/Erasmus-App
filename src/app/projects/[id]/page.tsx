@@ -11,6 +11,7 @@ interface Project {
   project_title: string
   organization_id: string
   organization_name: string | null
+  project_email: string | null
   searching_partners_countries: string[]
   begin_date: string | null
   end_date: string | null
@@ -72,29 +73,37 @@ export default function ProjectDetailPage() {
       return
     }
 
-    // Get organization email from profile
-    const { data: orgProfile } = await supabase
-      .from('profiles')
-      .select('email, organization_name')
-      .eq('id', project.organization_id)
-      .single()
+    // Use project_email if available, otherwise fallback to fetching from profile
+    let contactEmail = project.project_email
 
-    if (!orgProfile?.email) {
-      alert('Organization email not found')
-      return
+    if (!contactEmail) {
+      // Fallback: Get organization email from profile
+      const { data: orgProfile } = await supabase
+        .from('profiles')
+        .select('email, organization_name')
+        .eq('id', project.organization_id)
+        .single()
+
+      if (!orgProfile?.email) {
+        alert('Organization email not found')
+        return
+      }
+      contactEmail = orgProfile.email
     }
 
-    // Create mailto link
-    const subject = encodeURIComponent(`Partnership Request: ${project.project_title}`)
+    // Create formal mailto link with professional draft email
+    const subject = encodeURIComponent(`Partnership Collaboration Request: ${project.project_title}`)
     const body = encodeURIComponent(
-      `Hello,\n\n` +
-      `I am interested in partnering with you on your project: "${project.project_title}"\n\n` +
-      `My organization: ${profile.organization_name || 'N/A'}\n` +
-      `Please contact me to discuss partnership opportunities.\n\n` +
-      `Best regards`
+      `Dear ${project.organization_name || 'Organization'} Team,\n\n` +
+      `I hope this message finds you well. I am writing to express my organization's interest in collaborating on your project: "${project.project_title}".\n\n` +
+      `My organization, ${profile.organization_name || 'N/A'}, is very interested in exploring partnership opportunities with you. We believe there is great potential for a mutually beneficial collaboration.\n\n` +
+      `I would like to discuss how our organizations can work together on this initiative. Please let me know your availability for a conversation, and I would be happy to provide more information about our organization and how we might contribute to this project.\n\n` +
+      `Thank you for your time and consideration. I look forward to hearing from you.\n\n` +
+      `Best regards,\n` +
+      `${profile.organization_name || 'Organization Representative'}`
     )
     
-    window.location.href = `mailto:${orgProfile.email}?subject=${subject}&body=${body}`
+    window.location.href = `mailto:${contactEmail}?subject=${subject}&body=${body}`
   }
 
   const formatDate = (dateString: string | null) => {

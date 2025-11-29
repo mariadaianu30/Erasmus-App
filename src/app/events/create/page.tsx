@@ -143,7 +143,6 @@ export default function CreateEventPage() {
         const { data: { session }, error } = await supabase.auth.getSession()
         
         if (error) {
-          console.error('Session error:', error)
           router.push('/auth')
           return
         }
@@ -163,7 +162,6 @@ export default function CreateEventPage() {
           .single()
 
         if (profileError) {
-          console.error('Profile error:', profileError)
           router.push('/auth')
           return
         }
@@ -175,7 +173,6 @@ export default function CreateEventPage() {
 
         setProfile(profileData)
       } catch (error) {
-        console.error('Session setup error:', error)
         router.push('/auth')
       } finally {
         setLoading(false)
@@ -207,8 +204,10 @@ export default function CreateEventPage() {
         }
         return ''
       case 'group_size':
-        if (value < 1) return 'Group size must be at least 1'
-        if (value > 1000) return 'Group size cannot exceed 1000'
+        if (value === '' || value === null || value === undefined) return 'Group size is required'
+        const size = typeof value === 'string' ? parseInt(value) : value
+        if (isNaN(size) || size < 1) return 'Group size must be at least 1'
+        if (size > 1000) return 'Group size cannot exceed 1000'
         return ''
       case 'participation_fee_reason':
         if (formData.participation_fee && parseFloat(formData.participation_fee.toString()) > 0) {
@@ -236,7 +235,27 @@ export default function CreateEventPage() {
         const checked = (e.target as HTMLInputElement).checked
         newValue = checked
       } else if (name === 'group_size') {
-        newValue = parseInt(value) || 1
+        // Allow empty string for proper typing, only parse when there's a value
+        if (value === '') {
+          newValue = ''
+        } else {
+          const parsed = parseInt(value)
+          newValue = isNaN(parsed) ? '' : parsed
+        }
+      } else if (name === 'start_date') {
+        newValue = value
+        // Auto-set end_date to be 1 day after start_date if end_date is empty or before start_date
+        if (value) {
+          const startDate = new Date(value)
+          const currentEndDate = prev.end_date ? new Date(prev.end_date) : null
+          if (!currentEndDate || currentEndDate <= startDate) {
+            const suggestedEndDate = new Date(startDate)
+            suggestedEndDate.setDate(suggestedEndDate.getDate() + 1)
+            // Format as datetime-local (YYYY-MM-DDTHH:mm)
+            const formattedEndDate = suggestedEndDate.toISOString().slice(0, 16)
+            return { ...prev, [name]: newValue, end_date: formattedEndDate }
+          }
+        }
       } else if (name === 'participation_fee') {
         newValue = value
       } else {
@@ -292,6 +311,13 @@ export default function CreateEventPage() {
     }
   }, [success])
 
+  // Validate participation_fee_reason when participation_fee changes
+  useEffect(() => {
+    if (touchedFields.participation_fee_reason) {
+      const error = validateField('participation_fee_reason', formData.participation_fee_reason)
+      setFieldErrors(prev => ({ ...prev, participation_fee_reason: error }))
+    }
+  }, [formData.participation_fee, touchedFields.participation_fee_reason])
 
   const handleTargetGroupChange = (group: string) => {
     setFormData(prev => {
@@ -343,11 +369,12 @@ export default function CreateEventPage() {
     }
 
     // 11. Group Size
-    if (formData.group_size < 1) {
+    const groupSize = typeof formData.group_size === 'string' ? parseInt(formData.group_size) : formData.group_size
+    if (!groupSize || groupSize < 1) {
       errors.push('Group size must be at least 1')
     }
 
-    if (formData.group_size > 1000) {
+    if (groupSize > 1000) {
       errors.push('Group size cannot exceed 1000')
     }
 
@@ -399,17 +426,107 @@ export default function CreateEventPage() {
         uploadedPhotoUrl = publicData.publicUrl
       }
 
+      // Verify user is authenticated and refresh session
+      const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser()
+      if (authError || !currentUser) {
+        setError('You are not logged in. Please log in and try again.')
+        setSaving(false)
+        return
+      }
+
+      // Refresh session to ensure auth token is valid
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError || !session) {
+        setError('Session expired. Please log in again.')
+        setSaving(false)
+        return
+      }
+
+      // Verify user profile exists and is an organization (helps with RLS)
+      const { data: userProfile, error: profileCheckError } = await supabase
+        .from('profiles')
+        .select('user_type, organization_name')
+        .eq('id', currentUser.id)
+        .single()
+
+      if (profileCheckError || !userProfile) {
+        setError('Profile not found. Please complete your profile setup first.')
+        setSaving(false)
+        return
+      }
+
+      if (userProfile.user_type !== 'organization') {
+        setError('Only organizations can create events. Please log in with an organization account.')
+        setSaving(false)
+        return
+      }
+
+      // Convert datetime-local format to ISO format for database
+      let startDateISO: string | null = null
+      let endDateISO: string | null = null
+      
+      try {
+        if (formData.start_date) {
+          const startDate = new Date(formData.start_date)
+          if (isNaN(startDate.getTime())) {
+            throw new Error('Invalid start date format')
+          }
+          startDateISO = startDate.toISOString()
+        }
+        
+        if (formData.end_date) {
+          const endDate = new Date(formData.end_date)
+          if (isNaN(endDate.getTime())) {
+            throw new Error('Invalid end date format')
+          }
+          endDateISO = endDate.toISOString()
+        }
+      } catch (dateError: any) {
+        setError(`Date format error: ${dateError.message}. Please check your date inputs.`)
+        setSaving(false)
+        return
+      }
+
+      if (!startDateISO || !endDateISO) {
+        setError('Start date and end date are required.')
+        setSaving(false)
+        return
+      }
+
+      // Ensure event_type is set (required field)
+      if (!formData.event_type || !formData.event_type.trim()) {
+        setError('Event type is required. Please select an event type from the dropdown.')
+        setSaving(false)
+        return
+      }
+
       const eventData: any = {
         // Required fields
         title: formData.title.trim(),
-        start_date: formData.start_date,
-        end_date: formData.end_date,
-        organization_id: user.id,
-        organization_name: profile.organization_name || 'Unknown Organization',
-        organization_website: (profile as any).website || null,
+        start_date: startDateISO,
+        end_date: endDateISO,
+        organization_id: currentUser.id,
+        organization_name: userProfile.organization_name || profile.organization_name || 'Unknown Organization',
         is_published: true,
         // New structured fields
-        event_type: formData.event_type || null,
+        // Ensure event_type is either a valid enum value or null (not empty string)
+        // Valid enum values: 'Youth exchange', 'Training Course', 'Seminar', 'Study visit', 
+        // 'Partnership - Building Activity', 'Conference simpozion forum', 'E-learning', 'Other'
+        event_type: (() => {
+          const eventType = formData.event_type?.trim()
+          const validEventTypes = [
+            'Youth exchange',
+            'Training Course',
+            'Seminar',
+            'Study visit',
+            'Partnership - Building Activity',
+            'Conference simpozion forum',
+            'E-learning',
+            'Other'
+          ]
+          // Return the value if it's valid, otherwise null
+          return eventType && validEventTypes.includes(eventType) ? eventType : null
+        })(),
         venue_place: formData.venue_place.trim() || null,
         city: formData.city.trim() || null,
         country: formData.country.trim() || null,
@@ -418,93 +535,129 @@ export default function CreateEventPage() {
         photo_url: uploadedPhotoUrl || formData.photo_url || null,
         is_funded: formData.is_funded,
         target_groups: formData.target_groups.length > 0 ? formData.target_groups : null,
-        group_size: formData.group_size,
+        group_size: typeof formData.group_size === 'string' ? parseInt(formData.group_size) || 1 : formData.group_size,
         working_language: formData.working_language.trim() || null,
         participation_fee: formData.participation_fee ? parseFloat(formData.participation_fee.toString()) : null,
         participation_fee_reason: formData.participation_fee_reason.trim() || null,
         accommodation_food_details: formData.accommodation_food_details.trim() || null,
         transport_details: formData.transport_details.trim() || null,
         // Legacy fields for backward compatibility (set from new fields)
-        // Ensure description is never empty (required field)
-        description: formData.full_description.trim() || formData.short_description.trim() || formData.title.trim() || 'Event description',
+        // Ensure description is never empty and meets check constraint
+        // The description field has a check constraint that requires it to be non-empty
+        description: (() => {
+          const fullDesc = formData.full_description.trim()
+          const shortDesc = formData.short_description.trim()
+          const titleDesc = formData.title.trim()
+          
+          // Prioritize: full_description > short_description > title
+          // Ensure we always have a non-empty string that meets the constraint
+          if (fullDesc && fullDesc.length > 0) {
+            return fullDesc
+          }
+          if (shortDesc && shortDesc.length > 0) {
+            return shortDesc
+          }
+          if (titleDesc && titleDesc.length > 0) {
+            return `${titleDesc} - Join us for this exciting Erasmus+ event opportunity!`
+          }
+          // Fallback: ensure it's a meaningful description
+          return `Join us for this exciting Erasmus+ event: ${formData.title.trim() || 'Event'}`
+        })(),
         location: [formData.venue_place, formData.city, formData.country].filter(Boolean).join(', ') || 'Location TBD',
-        max_participants: formData.group_size || 50,
+        max_participants: typeof formData.group_size === 'string' ? parseInt(formData.group_size) || 50 : (formData.group_size || 50),
         category: formData.event_type || 'Other'
       }
-
-      // Verify user is authenticated
-      const { data: { user: currentUser } } = await supabase.auth.getUser()
-      if (!currentUser) {
-        setError('You are not logged in. Please log in and try again.')
+      
+      // Direct insert with timeout protection
+      // Create a timeout that will reject if the request takes too long
+      let timeoutId: NodeJS.Timeout | null = null
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error('Request timed out. Please check your connection and try again.'))
+        }, 20000) // 20 second timeout
+      })
+      
+      // Insert with timeout race
+      const insertPromise = supabase
+        .from('events')
+        .insert(eventData)
+        .select()
+      
+      let data: any = null
+      let insertError: any = null
+      
+      try {
+        // Race between insert and timeout
+        const result = await Promise.race([
+          Promise.resolve(insertPromise).then(result => {
+            // Clear timeout if insert completes
+            if (timeoutId) {
+              clearTimeout(timeoutId)
+              timeoutId = null
+            }
+            return result
+          }).catch(err => {
+            if (timeoutId) {
+              clearTimeout(timeoutId)
+              timeoutId = null
+            }
+            throw err
+          }),
+          timeoutPromise
+        ]) as any
+        
+        // If we get here, the insert completed (not timeout)
+        data = result?.data
+        insertError = result?.error
+      } catch (timeoutError: any) {
+        // Timeout occurred or other error
+        if (timeoutId) {
+          clearTimeout(timeoutId)
+          timeoutId = null
+        }
+        
+        // Check if it's a timeout or network error
+        const isTimeout = timeoutError?.message?.includes('timed out') || timeoutError?.message?.includes('timeout')
+        const errorMessage = isTimeout 
+          ? 'Request timed out. Please check your connection and try again.'
+          : timeoutError?.message || 'Request failed. Please try again.'
+        
+        setError(errorMessage)
+        setSaving(false)
+        return
+      } finally {
+        // Ensure timeout is cleared
+        if (timeoutId) {
+          clearTimeout(timeoutId)
+          timeoutId = null
+        }
+      }
+      
+      if (insertError) {
+        // Provide user-friendly error messages
+        if (insertError.code === '23514') {
+          // Check constraint violation
+          if (insertError.message?.includes('description')) {
+            setError('Description field validation failed. Please ensure you provide a description in either the "Full Description" or "Short Description" field.')
+          } else if (insertError.message?.includes('event_type')) {
+            setError('Event type validation failed. Please select a valid event type from the dropdown.')
+          } else {
+            setError(`Data validation error: ${insertError.message || 'Please check all required fields are filled correctly.'}`)
+          }
+        } else if (insertError.code === '42501' || insertError.message?.includes('permission') || insertError.message?.includes('policy')) {
+          setError('Permission denied. Please ensure you are logged in as an organization account and your profile is set up correctly.')
+        } else if (insertError.code === '23503') {
+          setError('Invalid organization ID. Please log out and log back in, then try again.')
+        } else if (insertError.message?.includes('timeout') || insertError.message?.includes('TIMEOUT')) {
+          setError('Request timed out. Please check your internet connection and try again.')
+        } else {
+          setError(`Failed to create event: ${insertError.message || 'Unknown error'}. Please check the browser console for details.`)
+        }
         setSaving(false)
         return
       }
-      
-      console.log('=== EVENT CREATION DEBUG ===')
-      console.log('User ID:', currentUser.id)
-      console.log('User email:', currentUser.email)
-      console.log('Profile:', profile)
-      console.log('Organization ID in eventData:', eventData.organization_id)
-      console.log('Event data:', JSON.stringify(eventData, null, 2))
-      console.log('===========================')
-
-      // Direct insert with timeout protection
-      console.log('Starting database insert...')
-      const startTime = Date.now()
-      
-      let timeoutHandle: NodeJS.Timeout
-      let insertResult
-      
-      try {
-        // Create timeout promise (reduced to 15 seconds for faster feedback)
-        const timeoutPromise = new Promise((_, reject) => {
-          timeoutHandle = setTimeout(() => {
-            reject(new Error('TIMEOUT: Request took longer than 15 seconds. Open Network tab (F12) and check the /rest/v1/events request status code.'))
-          }, 15000)
-        })
-        
-        // Create insert promise
-        const insertPromise = supabase
-          .from('events')
-          .insert(eventData)
-          .select()
-        
-        // Race them
-        insertResult = await Promise.race([insertPromise, timeoutPromise]) as any
-        
-        clearTimeout(timeoutHandle!)
-        const endTime = Date.now()
-        console.log(`✅ Insert completed in ${endTime - startTime}ms`)
-        console.log('Insert result:', insertResult)
-      } catch (insertErr: any) {
-        clearTimeout(timeoutHandle!)
-        const endTime = Date.now()
-        console.error(`❌ Insert failed after ${endTime - startTime}ms`)
-        console.error('Error type:', typeof insertErr)
-        console.error('Error:', insertErr)
-        console.error('Error message:', insertErr?.message)
-        console.error('Error code:', insertErr?.code)
-        console.error('Error details:', insertErr?.details)
-        console.error('Error hint:', insertErr?.hint)
-        setSaving(false)
-        throw insertErr
-      }
-      
-      const { data, error: insertError } = insertResult
-
-      if (insertError) {
-        console.error('Insert error details:', insertError)
-        console.error('Error code:', insertError.code)
-        console.error('Error message:', insertError.message)
-        console.error('Error details:', insertError.details)
-        console.error('Error hint:', insertError.hint)
-        setSaving(false)
-        throw insertError
-      }
 
       if (!data || data.length === 0) {
-        console.error('No data returned from insert')
-        console.error('Full result:', insertResult)
         setSaving(false)
         throw new Error('No data returned from database')
       }
@@ -512,9 +665,7 @@ export default function CreateEventPage() {
       // Get the first (and should be only) item
       const createdEvent = data[0]
 
-      console.log('Event created successfully:', createdEvent)
       setSuccess('Event created successfully!')
-      console.log('Success notification should appear now')
       
       // Clear form
       setFormData({
@@ -546,12 +697,6 @@ export default function CreateEventPage() {
       }, 3500) // 3.5 seconds to see the notification before redirect
 
     } catch (error: any) {
-      console.error('Event creation error:', error)
-      console.error('Error type:', typeof error)
-      console.error('Error constructor:', error?.constructor?.name)
-      console.error('Error keys:', Object.keys(error || {}))
-      console.error('Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
-      
       // Check if it's a timeout error
       if (error?.message?.includes('timed out') || error?.message?.includes('timeout') || error?.message?.includes('TIMEOUT')) {
         setError('Request timed out after 20 seconds. Open browser DevTools (F12) → Network tab → Look for the /rest/v1/events request → Check its status code. If it shows 403, RLS is blocking. If it shows pending, the request is hanging. Run TEST_RLS.sql in Supabase to verify policies.')
@@ -706,7 +851,14 @@ export default function CreateEventPage() {
                 name="event_type"
                 value={formData.event_type}
                 onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onBlur={handleBlur}
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                  touchedFields.event_type && fieldErrors.event_type
+                    ? 'border-red-300 focus:ring-red-500'
+                    : touchedFields.event_type && !fieldErrors.event_type
+                    ? 'border-green-300 focus:ring-green-500'
+                    : 'border-gray-300'
+                }`}
                 required
               >
                 <option value="">Select event type</option>
@@ -714,6 +866,11 @@ export default function CreateEventPage() {
                   <option key={type} value={type}>{type}</option>
                 ))}
               </select>
+              {touchedFields.event_type && fieldErrors.event_type && (
+                <p className="mt-1 text-sm text-red-600 flex items-center gap-1" role="alert">
+                  <span>{fieldErrors.event_type}</span>
+                </p>
+              )}
             </div>
 
             {/* 3. Begin date - end date */}
@@ -730,10 +887,22 @@ export default function CreateEventPage() {
                     name="start_date"
                     value={formData.start_date}
                     onChange={handleInputChange}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    onBlur={handleBlur}
+                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                      touchedFields.start_date && fieldErrors.start_date
+                        ? 'border-red-300 focus:ring-red-500'
+                        : touchedFields.start_date && !fieldErrors.start_date
+                        ? 'border-green-300 focus:ring-green-500'
+                        : 'border-gray-300'
+                    }`}
                     required
                   />
                 </div>
+                {touchedFields.start_date && fieldErrors.start_date && (
+                  <p className="mt-1 text-sm text-red-600 flex items-center gap-1" role="alert">
+                    <span>{fieldErrors.start_date}</span>
+                  </p>
+                )}
               </div>
 
               <div>
@@ -748,10 +917,28 @@ export default function CreateEventPage() {
                     name="end_date"
                     value={formData.end_date}
                     onChange={handleInputChange}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    onBlur={handleBlur}
+                    min={formData.start_date || undefined}
+                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                      touchedFields.end_date && fieldErrors.end_date
+                        ? 'border-red-300 focus:ring-red-500'
+                        : touchedFields.end_date && !fieldErrors.end_date
+                        ? 'border-green-300 focus:ring-green-500'
+                        : 'border-gray-300'
+                    }`}
                     required
                   />
                 </div>
+                {touchedFields.end_date && fieldErrors.end_date && (
+                  <p className="mt-1 text-sm text-red-600 flex items-center gap-1" role="alert">
+                    <span>{fieldErrors.end_date}</span>
+                  </p>
+                )}
+                {formData.start_date && formData.end_date && !fieldErrors.end_date && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    End date automatically set to 1 day after start date. You can adjust it if needed.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -850,26 +1037,34 @@ export default function CreateEventPage() {
                 <Image className="h-4 w-4 inline mr-2" aria-hidden="true" />
                 Event Cover Image (PNG)
               </label>
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-4">
                 <input
                   type="file"
                   accept="image/png"
                   onChange={handleImageChange}
                   className="w-full px-4 py-2 border border-dashed border-gray-300 rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
-                <p className="text-xs text-gray-500">
-                  Recommended 1200×630px PNG. This image will appear on the event card and detail page.
-                </p>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-800 font-medium mb-1">📐 Recommended Dimensions</p>
+                  <p className="text-xs text-blue-700">
+                    <strong>Optimal:</strong> 1920×800px (2.4:1 aspect ratio) or wider<br />
+                    <strong>Minimum:</strong> 1200×500px<br />
+                    This image will be displayed prominently at the top of the event detail page as a hero image.
+                  </p>
+                </div>
                 {(imagePreview || formData.photo_url) && (
                   <div className="relative">
-                    <img
-                      src={imagePreview || formData.photo_url || undefined}
-                      alt="Event preview"
-                      className="w-full h-48 object-cover rounded-lg border border-gray-200"
-                    />
+                    <div className="relative w-full h-[300px] sm:h-[400px] rounded-lg overflow-hidden border-2 border-gray-200 shadow-sm">
+                      <img
+                        src={imagePreview || formData.photo_url || undefined}
+                        alt="Event preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent pointer-events-none"></div>
+                    </div>
                     {imagePreview && (
-                      <p className="text-xs text-gray-500 mt-2">
-                        Preview shown from the file you just selected.
+                      <p className="text-xs text-gray-500 mt-2 text-center">
+                        Preview: This is how your image will appear on the event detail page
                       </p>
                     )}
                   </div>
@@ -922,14 +1117,37 @@ export default function CreateEventPage() {
                   type="number"
                   id="group_size"
                   name="group_size"
-                  value={formData.group_size}
+                  value={formData.group_size === '' ? '' : formData.group_size}
                   onChange={handleInputChange}
+                  onBlur={(e) => {
+                    // On blur, if empty, set to default value of 1
+                    if (e.target.value === '' || parseInt(e.target.value) < 1) {
+                      setFormData(prev => ({ ...prev, group_size: 1 }))
+                    } else {
+                      const val = parseInt(e.target.value)
+                      if (!isNaN(val) && val >= 1 && val <= 1000) {
+                        setFormData(prev => ({ ...prev, group_size: val }))
+                      }
+                    }
+                    handleBlur(e)
+                  }}
                   min="1"
                   max="1000"
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                    touchedFields.group_size && fieldErrors.group_size
+                      ? 'border-red-300 focus:ring-red-500'
+                      : touchedFields.group_size && !fieldErrors.group_size
+                      ? 'border-green-300 focus:ring-green-500'
+                      : 'border-gray-300'
+                  }`}
                   required
                 />
               </div>
+              {touchedFields.group_size && fieldErrors.group_size && (
+                <p className="mt-1 text-sm text-red-600 flex items-center gap-1" role="alert">
+                  <span>{fieldErrors.group_size}</span>
+                </p>
+              )}
             </div>
 
             {/* 12. Working language */}
@@ -977,11 +1195,23 @@ export default function CreateEventPage() {
                   name="participation_fee_reason"
                   value={formData.participation_fee_reason}
                   onChange={handleInputChange}
+                  onBlur={handleBlur}
                   rows={3}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-colors ${
+                    touchedFields.participation_fee_reason && fieldErrors.participation_fee_reason
+                      ? 'border-red-300 focus:ring-red-500'
+                      : touchedFields.participation_fee_reason && !fieldErrors.participation_fee_reason
+                      ? 'border-green-300 focus:ring-green-500'
+                      : 'border-gray-300'
+                  }`}
                   placeholder="Please explain why there is a participation fee"
                   required={Number(formData.participation_fee || 0) > 0}
                 />
+                {touchedFields.participation_fee_reason && fieldErrors.participation_fee_reason && (
+                  <p className="mt-1 text-sm text-red-600 flex items-center gap-1" role="alert">
+                    <span>{fieldErrors.participation_fee_reason}</span>
+                  </p>
+                )}
               </div>
             </div>
 

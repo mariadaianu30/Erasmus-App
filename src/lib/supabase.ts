@@ -1,9 +1,10 @@
-import { createClient } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Use createBrowserClient for proper cookie-based auth in Next.js App Router
+export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey)
 
 // Database types
 export interface Database {
@@ -276,4 +277,4 @@ export interface Database {
 }
 
 // Helper functions for common operations
-export const supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey)
+export const supabaseClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey)

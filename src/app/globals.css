@@ -47,16 +47,44 @@ body {
   transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
 }
 
+/* Smooth page transitions */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Page fade-in animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-transition {
+  animation: fadeIn 0.3s ease-out;
+}
+
 /* Mobile optimizations */
 @media (max-width: 768px) {
-  * {
-    transition: none; /* Disable transitions on mobile for better performance */
-  }
-  
-  /* Optimize touch targets */
-  button, a, input, select, textarea {
+  /* Optimize touch targets - ensure all interactive elements are easily tappable */
+  button:not([disabled]), 
+  a:not([aria-disabled="true"]), 
+  input[type="button"], 
+  input[type="submit"],
+  [role="button"] {
     min-height: 44px;
     min-width: 44px;
+    touch-action: manipulation; /* Remove 300ms tap delay */
+  }
+  
+  /* Improve form inputs on mobile */
+  input, select, textarea {
+    font-size: 16px; /* Prevents zoom on iOS */
+    min-height: 44px;
   }
   
   /* Reduce motion for better performance */
@@ -67,6 +95,41 @@ body {
       transition-duration: 0.01ms !important;
     }
   }
+}
+
+/* Smooth link transitions */
+a, button {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Consistent button hover states */
+button:not(:disabled):hover,
+a:not([aria-disabled="true"]):hover {
+  transform: translateY(-1px);
+}
+
+button:not(:disabled):active,
+a:not([aria-disabled="true"]):active {
+  transform: translateY(0);
+}
+
+/* Disable transform on mobile for better performance */
+@media (max-width: 768px) {
+  button:not(:disabled):hover,
+  a:not([aria-disabled="true"]):hover {
+    transform: none;
+  }
+}
+
+/* Improve focus visibility for accessibility */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 /* Loading animation */
@@ -108,6 +171,23 @@ body {
 
 .animate-slide-in {
   animation: slideIn 0.3s ease-out;
+}
+
+/* Hide scrollbar but keep functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Smooth scroll for better UX */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 /* Floating background animations */

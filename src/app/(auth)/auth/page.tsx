@@ -230,11 +230,18 @@ export default function AuthPage() {
           setLoading(false)
           return
         }
+        if (!formData.firstName.trim() || !formData.lastName.trim()) {
+          setError('Please enter a contact first and last name for your organization.')
+          setLoading(false)
+          return
+        }
       }
 
       const formattedFirstName = formatNameField(formData.firstName) || ''
       const formattedLastName = formatNameField(formData.lastName) || ''
       const formattedOrgName = formatNameField(formData.organizationName) || ''
+
+      const birthDateValue = formData.birth_date || '1990-01-01'
 
       const participantProfileDefaults =
         formData.userType === 'participant'
@@ -242,7 +249,7 @@ export default function AuthPage() {
               first_name: formattedFirstName,
               last_name: formattedLastName,
               email: formData.email,
-              birth_date: formData.birth_date || null,
+              birth_date: birthDateValue,
               location: formData.location.trim(),
               gender: formData.gender || null,
               nationality: formData.nationality.trim() || null,
@@ -263,7 +270,7 @@ export default function AuthPage() {
         last_name: formattedLastName,
         user_type: formData.userType,
         organization_name: formattedOrgName || null,
-        birth_date: formData.birth_date || null,
+        birth_date: birthDateValue,
         participant_profile_defaults: participantProfileDefaults,
         organization_profile_defaults:
           formData.userType === 'organization'
@@ -338,6 +345,9 @@ export default function AuthPage() {
           const organizationProfile = {
             id: authData.user.id,
             user_type: 'organization',
+            first_name: formattedFirstName || formattedOrgName || 'Organization',
+            last_name: formattedLastName || 'Representative',
+            birth_date: birthDateValue,
             organization_name: formattedOrgName || '',
             email: formData.email,
             location: formData.location.trim(),
@@ -890,6 +900,38 @@ export default function AuthPage() {
                     className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     placeholder="City, Country"
                   />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="contactFirstName" className="block text-sm font-medium text-gray-700">
+                      Contact first name
+                    </label>
+                    <input
+                      id="contactFirstName"
+                      name="firstName"
+                      type="text"
+                      required
+                      value={formData.firstName}
+                      onChange={handleInputChange}
+                      className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      placeholder="Primary contact first name"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="contactLastName" className="block text-sm font-medium text-gray-700">
+                      Contact last name
+                    </label>
+                    <input
+                      id="contactLastName"
+                      name="lastName"
+                      type="text"
+                      required
+                      value={formData.lastName}
+                      onChange={handleInputChange}
+                      className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      placeholder="Primary contact last name"
+                    />
+                  </div>
                 </div>
               </div>
             )}

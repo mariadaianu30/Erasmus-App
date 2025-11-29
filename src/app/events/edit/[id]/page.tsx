@@ -9,6 +9,7 @@ import {
   Calendar,
   CalendarCheck,
   CheckCircle,
+  Image,
   Loader2,
   Save,
   Trash2,
@@ -245,7 +246,28 @@ export default function EditEventPage() {
         return prev
       }
       if (name === 'group_size') {
-        return { ...prev, [name]: parseInt(value) || 1 }
+        // Allow empty string for proper typing, only parse when there's a value
+        if (value === '') {
+          return { ...prev, [name]: '' }
+        } else {
+          const parsed = parseInt(value)
+          return { ...prev, [name]: isNaN(parsed) ? '' : parsed }
+        }
+      }
+      if (name === 'start_date') {
+        // Auto-set end_date to be 1 day after start_date if end_date is empty or before start_date
+        if (value) {
+          const startDate = new Date(value)
+          const currentEndDate = prev.end_date ? new Date(prev.end_date) : null
+          if (!currentEndDate || currentEndDate <= startDate) {
+            const suggestedEndDate = new Date(startDate)
+            suggestedEndDate.setDate(suggestedEndDate.getDate() + 1)
+            // Format as datetime-local (YYYY-MM-DDTHH:mm)
+            const formattedEndDate = suggestedEndDate.toISOString().slice(0, 16)
+            return { ...prev, [name]: value, end_date: formattedEndDate }
+          }
+        }
+        return { ...prev, [name]: value }
       }
       if (name === 'participation_fee') {
         return { ...prev, [name]: value }
@@ -289,7 +311,20 @@ export default function EditEventPage() {
 
   const validateForm = () => {
     if (!formData.title.trim()) return 'Event title is required.'
-    if (!formData.event_type) return 'Event type is required.'
+    // Event type is required - must be a valid enum value
+    const validEventTypes = [
+      'Youth exchange',
+      'Training Course',
+      'Seminar',
+      'Study visit',
+      'Partnership - Building Activity',
+      'Conference simpozion forum',
+      'E-learning',
+      'Other'
+    ]
+    if (!formData.event_type || !validEventTypes.includes(formData.event_type)) {
+      return 'Please select a valid event type.'
+    }
     if (!formData.start_date) return 'Start date is required.'
     if (!formData.end_date) return 'End date is required.'
     if (formData.start_date && formData.end_date) {
@@ -300,8 +335,13 @@ export default function EditEventPage() {
     if (formData.participation_fee && parseFloat(formData.participation_fee) > 0 && !formData.participation_fee_reason.trim()) {
       return 'Please provide a reason for the participation fee.'
     }
-    if (formData.group_size < 1) return 'Group size must be at least 1.'
-    if (formData.group_size > 1000) return 'Group size cannot exceed 1000.'
+    const groupSize = typeof formData.group_size === 'string' ? parseInt(formData.group_size) : formData.group_size
+    if (!groupSize || groupSize < 1) return 'Group size must be at least 1.'
+    if (groupSize > 1000) return 'Group size cannot exceed 1000.'
+    // Ensure at least one description field has content
+    if (!formData.full_description.trim() && !formData.short_description.trim()) {
+      return 'Please provide either a short description or full description.'
+    }
     return null
   }
 
@@ -338,13 +378,47 @@ export default function EditEventPage() {
 
     setSaving(true)
     try {
+      // Verify user is authenticated and refresh session
+      const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser()
+      if (authError || !currentUser) {
+        setFormError('You are not logged in. Please log in and try again.')
+        setSaving(false)
+        return
+      }
+
+      // Refresh session to ensure auth token is valid
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError || !session) {
+        setFormError('Session expired. Please log in again.')
+        setSaving(false)
+        return
+      }
+
       const photoUrl = await uploadImageIfNeeded()
+
+      // Ensure event_type is valid
+      const validEventTypes = [
+        'Youth exchange',
+        'Training Course',
+        'Seminar',
+        'Study visit',
+        'Partnership - Building Activity',
+        'Conference simpozion forum',
+        'E-learning',
+        'Other'
+      ]
+      const eventType = formData.event_type?.trim()
+      const validatedEventType = eventType && validEventTypes.includes(eventType) ? eventType : null
+
+      // Ensure dates are in ISO format
+      const startDateISO = formData.start_date ? new Date(formData.start_date).toISOString() : null
+      const endDateISO = formData.end_date ? new Date(formData.end_date).toISOString() : null
 
       const eventPayload: any = {
         title: formData.title.trim(),
-        event_type: formData.event_type || null,
-        start_date: formData.start_date,
-        end_date: formData.end_date,
+        event_type: validatedEventType,
+        start_date: startDateISO,
+        end_date: endDateISO,
         venue_place: formData.venue_place.trim() || null,
         city: formData.city.trim() || null,
         country: formData.country.trim() || null,
@@ -353,48 +427,112 @@ export default function EditEventPage() {
         photo_url: photoUrl,
         is_funded: formData.is_funded,
         is_published: formData.is_published,
-        target_groups: formData.target_groups.length ? formData.target_groups : null,
-        group_size: formData.group_size,
+        target_groups: formData.target_groups.length > 0 ? formData.target_groups : null,
+        group_size: typeof formData.group_size === 'string' ? parseInt(formData.group_size) || 1 : formData.group_size,
         working_language: formData.working_language.trim() || null,
-        participation_fee: formData.participation_fee ? parseFloat(formData.participation_fee) : null,
+        participation_fee: formData.participation_fee ? parseFloat(formData.participation_fee.toString()) : null,
         participation_fee_reason: formData.participation_fee_reason.trim() || null,
         accommodation_food_details: formData.accommodation_food_details.trim() || null,
         transport_details: formData.transport_details.trim() || null,
-        // Skip updating description field - it's a legacy/computed field that may have constraints
-        // The description is computed from full_description, short_description, or title
-        // Updating it directly may violate database constraints, so we leave it as-is
+        // Update description field to meet check constraint
+        description: (() => {
+          const fullDesc = formData.full_description.trim()
+          const shortDesc = formData.short_description.trim()
+          const titleDesc = formData.title.trim()
+          
+          if (fullDesc && fullDesc.length > 0) {
+            return fullDesc
+          }
+          if (shortDesc && shortDesc.length > 0) {
+            return shortDesc
+          }
+          if (titleDesc && titleDesc.length > 0) {
+            return `${titleDesc} - Join us for this exciting Erasmus+ event opportunity!`
+          }
+          return `Join us for this exciting Erasmus+ event: ${titleDesc || 'Event'}`
+        })(),
+        // Legacy fields for backward compatibility
         location: [formData.venue_place, formData.city, formData.country].filter(Boolean).join(', ') || 'Location TBD',
+        max_participants: formData.group_size || 50,
+        category: validatedEventType || 'Other',
         updated_at: new Date().toISOString(),
       }
 
-      console.log('Event payload being sent (without description field):', eventPayload)
+      console.log('Event payload being sent:', eventPayload)
+      console.log('Updating event ID:', eventId)
+      console.log('User ID:', currentUser.id)
+      console.log('Session valid:', !!session)
 
-      const { error: updateError } = await supabase
+      // Verify user profile exists and is an organization (helps with RLS)
+      const { data: userProfile, error: profileCheckError } = await supabase
+        .from('profiles')
+        .select('user_type, organization_name')
+        .eq('id', currentUser.id)
+        .single()
+
+      if (profileCheckError || !userProfile) {
+        setFormError('Profile not found. Please complete your profile setup first.')
+        setSaving(false)
+        return
+      }
+
+      if (userProfile.user_type !== 'organization') {
+        setFormError('Only organizations can edit events. Please log in with an organization account.')
+        setSaving(false)
+        return
+      }
+
+      // Update the event (RLS policies will ensure user owns it)
+      console.log('Attempting to update event with payload:', JSON.stringify(eventPayload, null, 2))
+      
+      // Ensure organization_id is set in the payload (in case it wasn't set before)
+      eventPayload.organization_id = currentUser.id
+      
+      const { data, error: updateError } = await supabase
         .from('events')
         .update(eventPayload)
         .eq('id', eventId)
+        .select()
 
       if (updateError) {
-        console.error('Update error object:', JSON.stringify(updateError, null, 2))
-        console.error('Update error keys:', Object.keys(updateError))
-        console.error('Update error message:', updateError.message)
-        console.error('Update error details:', updateError.details)
-        console.error('Update error hint:', updateError.hint)
-        console.error('Update error code:', updateError.code)
-        // Extract detailed error message from Supabase error
-        let errorMsg = updateError.message || 'Failed to update event in database.'
-        if (updateError.details) {
-          errorMsg += ` Details: ${updateError.details}`
-        }
-        if (updateError.hint) {
-          errorMsg += ` Hint: ${updateError.hint}`
-        }
-        if (updateError.code) {
-          errorMsg += ` Code: ${updateError.code}`
+        console.error('Update error:', updateError)
+        console.error('Error code:', updateError.code)
+        console.error('Error message:', updateError.message)
+        console.error('Error details:', updateError.details)
+        console.error('Error hint:', updateError.hint)
+        
+        // Provide user-friendly error messages
+        let errorMsg = 'Failed to update event.'
+        if (updateError.code === '23514') {
+          // Check constraint violation
+          if (updateError.message?.includes('description')) {
+            errorMsg = 'Description field validation failed. Please ensure you provide a description in either the "Full Description" or "Short Description" field.'
+          } else if (updateError.message?.includes('event_type')) {
+            errorMsg = 'Event type validation failed. Please select a valid event type from the dropdown.'
+          } else {
+            errorMsg = `Data validation error: ${updateError.message || 'Please check all required fields are filled correctly.'}`
+          }
+        } else if (updateError.code === '42501' || updateError.message?.includes('permission') || updateError.message?.includes('policy')) {
+          errorMsg = 'Permission denied. Please ensure you are logged in as an organization account and have permission to edit this event.'
+        } else if (updateError.code === '23503') {
+          errorMsg = 'Invalid organization ID. Please log out and log back in, then try again.'
+        } else {
+          errorMsg = updateError.message || 'Failed to update event in database.'
+          if (updateError.details) {
+            errorMsg += ` Details: ${updateError.details}`
+          }
+          if (updateError.hint) {
+            errorMsg += ` Hint: ${updateError.hint}`
+          }
         }
         throw new Error(errorMsg)
       }
 
+      if (!data || data.length === 0) {
+        throw new Error('No data returned from update. Event may not have been updated.')
+      }
+
+      console.log('Event updated successfully:', data[0])
       setSuccess('Event updated successfully. Redirecting you to your dashboard...')
       setExistingPhotoUrl(photoUrl)
       setImageFile(null)
@@ -537,10 +675,16 @@ export default function EditEventPage() {
                     name="end_date"
                     value={formData.end_date}
                     onChange={handleInputChange}
+                    min={formData.start_date || undefined}
                     className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                     required
                   />
                 </div>
+                {formData.start_date && formData.end_date && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    End date automatically set to 1 day after start date. You can adjust it if needed.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -611,22 +755,40 @@ export default function EditEventPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Cover Image (PNG)</label>
-              <div className="flex flex-col gap-3">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Image className="h-4 w-4 inline mr-2" aria-hidden="true" />
+                Event Cover Image (PNG)
+              </label>
+              <div className="flex flex-col gap-4">
                 <input
                   type="file"
                   accept="image/png"
                   onChange={handleImageChange}
-                  className="w-full px-3 py-2 border border-dashed border-gray-300 rounded-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-dashed border-gray-300 rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
-                <p className="text-xs text-gray-500">Recommended 1200×630px PNG.</p>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-800 font-medium mb-1">📐 Recommended Dimensions</p>
+                  <p className="text-xs text-blue-700">
+                    <strong>Optimal:</strong> 1920×800px (2.4:1 aspect ratio) or wider<br />
+                    <strong>Minimum:</strong> 1200×500px<br />
+                    This image will be displayed prominently at the top of the event detail page as a hero image.
+                  </p>
+                </div>
                 {(imagePreview || existingPhotoUrl) && (
-                  <div>
-                    <img
-                      src={imagePreview || existingPhotoUrl || ''}
-                      alt="Event preview"
-                      className="w-full h-48 object-cover rounded-lg border border-gray-200"
-                    />
+                  <div className="relative">
+                    <div className="relative w-full h-[300px] sm:h-[400px] rounded-lg overflow-hidden border-2 border-gray-200 shadow-sm">
+                      <img
+                        src={imagePreview || existingPhotoUrl || ''}
+                        alt="Event preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent pointer-events-none"></div>
+                    </div>
+                    {imagePreview && (
+                      <p className="text-xs text-gray-500 mt-2 text-center">
+                        Preview: This is how your image will appear on the event detail page
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -679,8 +841,19 @@ export default function EditEventPage() {
                 <input
                   type="number"
                   name="group_size"
-                  value={formData.group_size}
+                  value={formData.group_size === '' ? '' : formData.group_size}
                   onChange={handleInputChange}
+                  onBlur={(e) => {
+                    // On blur, if empty, set to default value of 1
+                    if (e.target.value === '' || parseInt(e.target.value) < 1) {
+                      setFormData(prev => ({ ...prev, group_size: 1 }))
+                    } else {
+                      const val = parseInt(e.target.value)
+                      if (!isNaN(val) && val >= 1 && val <= 1000) {
+                        setFormData(prev => ({ ...prev, group_size: val }))
+                      }
+                    }
+                  }}
                   min={1}
                   max={1000}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
@@ -783,7 +956,7 @@ export default function EditEventPage() {
           <Trash2 className="h-5 w-5 text-red-500 mt-1" />
           <div>
             <p className="text-sm text-gray-700">
-              Need to cancel the project entirely? Contact the Scout Society support team so we can remove it from the public listings.
+              Need to cancel the event entirely? You can delete it from the manage events page.
             </p>
           </div>
         </div>

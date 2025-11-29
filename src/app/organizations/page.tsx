@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Building, MapPin, Globe, Search, Users, Award } from 'lucide-react'
+import { Building, MapPin, Globe, Search, Users, Award, X, SlidersHorizontal } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 const slugifyOrganizationName = (name: string) =>
@@ -63,10 +63,21 @@ export default function OrganizationsPage() {
   }
 
   const filteredOrganizations = organizations.filter(org => {
-    return org.organization_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           (org.bio && org.bio.toLowerCase().includes(searchTerm.toLowerCase())) ||
-           (org.location && org.location.toLowerCase().includes(searchTerm.toLowerCase()))
+    const query = searchTerm.toLowerCase()
+    return !query || (
+      org.organization_name.toLowerCase().includes(query) ||
+      (org.bio && org.bio.toLowerCase().includes(query)) ||
+      (org.location && org.location.toLowerCase().includes(query)) ||
+      (org.first_name && org.first_name.toLowerCase().includes(query)) ||
+      (org.last_name && org.last_name.toLowerCase().includes(query))
+    )
   })
+
+  const clearSearch = () => {
+    setSearchTerm('')
+  }
+
+  const hasSearch = !!searchTerm
 
 
   if (loading) {
@@ -102,17 +113,31 @@ export default function OrganizationsPage() {
         </div>
 
         {/* Search */}
-        <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
+        <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6 mb-8">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search organizations by name, description, or location..."
+              placeholder="Search organizations by name, description, location, or contact..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
             />
+            {hasSearch && (
+              <button
+                onClick={clearSearch}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label="Clear search"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            )}
           </div>
+          {hasSearch && (
+            <div className="mt-3 text-sm text-gray-600">
+              Found <span className="font-semibold text-blue-600">{filteredOrganizations.length}</span> organization{filteredOrganizations.length !== 1 ? 's' : ''}
+            </div>
+          )}
         </div>
 
         {/* Organizations Grid */}
@@ -200,8 +225,19 @@ export default function OrganizationsPage() {
 
         {/* Results count */}
         {filteredOrganizations.length > 0 && (
-          <div className="text-center mt-8 text-gray-500">
-            Showing {filteredOrganizations.length} of {organizations.length} verified organizations
+          <div className="text-center mt-8">
+            <p className="text-gray-600 font-medium">
+              Showing <span className="text-blue-600 font-semibold">{filteredOrganizations.length}</span> of{' '}
+              <span className="text-gray-900 font-semibold">{organizations.length}</span> organizations
+              {hasSearch && (
+                <button
+                  onClick={clearSearch}
+                  className="ml-2 text-blue-600 hover:text-blue-700 underline text-sm"
+                >
+                  Clear search
+                </button>
+              )}
+            </p>
           </div>
         )}
       </div>

@@ -29,11 +29,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full">
+    <html lang="en" className="h-full scroll-smooth">
       <body className={`${interTight.variable} font-sans h-full antialiased`} suppressHydrationWarning>
         <div className="min-h-full flex flex-col">
           <Navbar />
-          <main className="flex-1">
+          <main className="flex-1 page-transition">
             {children}
           </main>
           <Footer />

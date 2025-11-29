@@ -393,34 +393,50 @@ export default function Navbar() {
 
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
-          <div className="md:hidden fixed inset-0 z-40 bg-black bg-opacity-50" onClick={() => setMobileMenuOpen(false)}>
-            <div className="bg-white w-64 h-full shadow-lg" onClick={(e) => e.stopPropagation()}>
-              <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-              {getNavigationItems().map((item) => (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={getMobileNavClasses(item.href)}
+          <div 
+            className="md:hidden fixed inset-0 z-40 bg-black bg-opacity-50 transition-opacity duration-300"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <div 
+              className="bg-white w-64 sm:w-80 h-full shadow-xl transform transition-transform duration-300 ease-out"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between p-4 border-b">
+                <span className="text-lg font-semibold text-gray-900">Menu</span>
+                <button
                   onClick={() => setMobileMenuOpen(false)}
+                  className="text-gray-500 hover:text-gray-700 p-1 rounded-md transition-colors"
+                  aria-label="Close menu"
                 >
-                  {item.name}
-                </Link>
-              ))}
-              
-              {!user && (
-                <div className="border-t pt-2 mt-2">
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+              <div className="px-2 pt-4 pb-3 space-y-1 overflow-y-auto max-h-[calc(100vh-80px)]">
+                {getNavigationItems().map((item) => (
                   <Link
-                    href="/auth"
-                    className="block bg-blue-600 text-white px-4 py-2 rounded-md text-base font-medium hover:bg-blue-700 transition-colors text-center mx-3"
+                    key={item.name}
+                    href={item.href}
+                    className={getMobileNavClasses(item.href)}
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    Login/Register
+                    {item.name}
                   </Link>
-                </div>
-              )}
-              
-              {user && (
-                <div className="border-t pt-2 mt-2">
+                ))}
+                
+                {!user && (
+                  <div className="border-t pt-4 mt-4">
+                    <Link
+                      href="/auth"
+                      className="block bg-blue-600 text-white px-4 py-3 rounded-lg text-base font-medium hover:bg-blue-700 transition-colors text-center mx-3"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Login/Register
+                    </Link>
+                  </div>
+                )}
+                
+                {user && (
+                  <div className="border-t pt-4 mt-4 space-y-2">
                   <Link
                     href="/profile"
                     className="flex items-center text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-base font-medium transition-colors"

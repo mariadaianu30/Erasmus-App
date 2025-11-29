@@ -301,7 +301,7 @@ export default function DashboardPage() {
               end_date,
               location,
               category,
-              organization_name
+              organization_id
             )
           `)
           .eq('participant_id', userId)
@@ -321,16 +321,49 @@ export default function DashboardPage() {
         return
       }
 
-      console.log('Applications fetched successfully:', data)
-      console.log('Number of applications:', data?.length || 0)
-      setApplications((data as unknown as Application[]) || [])
+      // Fetch organization names for all unique organization IDs
+      const organizationIds = [...new Set(
+        (data || [])
+          .map((app: any) => app.events?.organization_id)
+          .filter(Boolean)
+      )]
+      
+      let organizationMap: Record<string, string> = {}
+      
+      if (organizationIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, organization_name')
+          .in('id', organizationIds)
+        
+        if (profiles) {
+          profiles.forEach((profile: any) => {
+            organizationMap[profile.id] = profile.organization_name || null
+          })
+        }
+      }
+
+      // Map applications with organization names
+      const applicationsWithOrgNames = (data || []).map((app: any) => ({
+        ...app,
+        events: app.events ? {
+          ...app.events,
+          organization_name: app.events.organization_id 
+            ? (organizationMap[app.events.organization_id] || null)
+            : null
+        } : null
+      }))
+
+      console.log('Applications fetched successfully:', applicationsWithOrgNames)
+      console.log('Number of applications:', applicationsWithOrgNames?.length || 0)
+      setApplications((applicationsWithOrgNames as unknown as Application[]) || [])
       
       // Calculate stats
       const stats = {
-        total: data?.length || 0,
-        pending: data?.filter(app => app.status === 'pending').length || 0,
-        accepted: data?.filter(app => app.status === 'accepted').length || 0,
-        rejected: data?.filter(app => app.status === 'rejected').length || 0
+        total: applicationsWithOrgNames?.length || 0,
+        pending: applicationsWithOrgNames?.filter(app => app.status === 'pending').length || 0,
+        accepted: applicationsWithOrgNames?.filter(app => app.status === 'accepted').length || 0,
+        rejected: applicationsWithOrgNames?.filter(app => app.status === 'rejected').length || 0
       }
       setApplicationStats(stats)
     } catch (error) {
@@ -1212,9 +1245,11 @@ export default function DashboardPage() {
                             <h4 className="text-sm font-medium text-gray-900 mb-1">
                               {application.events.title}
                             </h4>
-                            <p className="text-xs text-gray-600 mb-1">
-                              by {application.events.organization_name || 'Erasmus+ Connect'}
-                            </p>
+                            {application.events.organization_name && (
+                              <p className="text-xs text-gray-600 mb-1">
+                                by {application.events.organization_name}
+                              </p>
+                            )}
                             <p className="text-xs text-gray-500">
                               Applied {new Date(application.created_at).toLocaleDateString()}
                             </p>
