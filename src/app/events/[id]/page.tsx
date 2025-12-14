@@ -27,6 +27,7 @@ import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/lib/utils'
 import { downloadCsvFile, participantToCsvRow, PARTICIPANT_CSV_HEADERS, ParticipantProfileForCsv } from '@/lib/csv'
+import ShareOpportunity from '@/components/ShareOpportunity'
 
 interface Event {
   id: string
@@ -184,13 +185,17 @@ export default function EventDetailsPage() {
 
   const checkUser = useCallback(async () => {
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      // Use getSession() instead of getUser() to avoid AuthSessionMissingError
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
       
-      if (userError) {
-        console.error('Error getting user:', userError)
+      if (sessionError) {
+        console.error('Error getting session:', sessionError)
+        setUser(null)
+        setUserProfile(null)
         return
       }
       
+      const user = session?.user || null
       setUser(user)
 
       if (user) {
@@ -623,12 +628,12 @@ export default function EventDetailsPage() {
                 </div>
               )}
               
-              <div className="p-6">
+              <div className="p-4 sm:p-6">
                 {/* Event Header */}
                 <div className="mb-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h1 className="text-3xl font-bold text-gray-900 mb-2">{event.title}</h1>
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
+                    <div className="flex-1 min-w-0">
+                      <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 break-words">{event.title}</h1>
                       {event.category && (
                         <div className="flex items-center text-blue-600 mb-4">
                           <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
@@ -637,11 +642,18 @@ export default function EventDetailsPage() {
                         </div>
                       )}
                     </div>
+                    <div className="flex-shrink-0">
+                      <ShareOpportunity 
+                        title={event.title} 
+                        url={`/events/${event.id}`} 
+                        type="event" 
+                      />
+                    </div>
                   </div>
 
                   {canManageEvent && (
                   <>
-                    <div className="flex flex-wrap gap-3 mb-4">
+                    <div className="flex flex-wrap gap-2 sm:gap-3 mb-4">
                       <button
                         onClick={handleOpenAcceptedModal}
                         className="inline-flex items-center gap-2 border border-blue-200 text-blue-700 font-semibold px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"

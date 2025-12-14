@@ -198,10 +198,10 @@ export default function EventsPage() {
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowFilters(!showFilters)}
-                  className={`flex items-center gap-2 px-4 py-3 border rounded-lg transition-colors ${
+                  className={`flex items-center gap-2 px-4 py-3 border rounded-lg transition-all duration-200 ${
                     showFilters || hasActiveFilters
-                      ? 'bg-blue-50 border-blue-300 text-blue-700'
-                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                      ? 'bg-blue-50 border-blue-300 text-blue-700 shadow-sm'
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
                   }`}
                   aria-label="Toggle filters"
                 >

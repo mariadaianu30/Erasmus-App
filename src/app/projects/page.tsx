@@ -41,8 +41,14 @@ export default function ProjectsPage() {
   }, [])
 
   const checkUser = async () => {
-    const { data: { user: currentUser } } = await supabase.auth.getUser()
-    if (currentUser) {
+    try {
+      // Use getSession() to avoid AuthSessionMissingError
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      const currentUser = session?.user
+      if (sessionError || !currentUser) {
+        setUser(null)
+        return
+      }
       setUser(currentUser)
       const { data: profileData } = await supabase
         .from('profiles')
@@ -50,6 +56,10 @@ export default function ProjectsPage() {
         .eq('id', currentUser.id)
         .single()
       setProfile(profileData)
+    } catch (error) {
+      console.error('Error checking user:', error)
+      setUser(null)
+      setProfile(null)
     }
   }
 

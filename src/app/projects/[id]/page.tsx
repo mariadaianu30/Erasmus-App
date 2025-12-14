@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Calendar, MapPin, Users, Tag, Mail, Clock, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
+import ShareOpportunity from '@/components/ShareOpportunity'
 
 interface Project {
   id: string
@@ -33,8 +34,17 @@ export default function ProjectDetailPage() {
   const [profile, setProfile] = useState<any>(null)
 
   const checkUser = useCallback(async () => {
-    const { data: { user: currentUser } } = await supabase.auth.getUser()
-    if (currentUser) {
+    try {
+      // Use getSession() instead of getUser() to avoid AuthSessionMissingError
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (sessionError || !session?.user) {
+        setUser(null)
+        setProfile(null)
+        return
+      }
+      
+      const currentUser = session.user
       setUser(currentUser)
       const { data: profileData } = await supabase
         .from('profiles')
@@ -42,6 +52,10 @@ export default function ProjectDetailPage() {
         .eq('id', currentUser.id)
         .single()
       setProfile(profileData)
+    } catch (error) {
+      console.error('Error checking user:', error)
+      setUser(null)
+      setProfile(null)
     }
   }, [])
 
@@ -165,17 +179,26 @@ export default function ProjectDetailPage() {
         <div className="bg-white rounded-lg shadow-sm border p-6 md:p-8">
           {/* Header */}
           <div className="mb-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
-              <h1 className="text-3xl font-bold text-gray-900">{project.project_title}</h1>
-              {project.project_type && (
-                <span className="bg-purple-100 text-purple-800 text-sm font-medium px-4 py-2 rounded-full">
-                  {project.project_type}
-                </span>
-              )}
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4">
+              <div className="flex-1 min-w-0">
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 break-words">{project.project_title}</h1>
+                <p className="text-gray-600">
+                  by <span className="font-medium">{project.organization_name || 'Unknown Organization'}</span>
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                {project.project_type && (
+                  <span className="bg-purple-100 text-purple-800 text-sm font-medium px-4 py-2 rounded-full whitespace-nowrap">
+                    {project.project_type}
+                  </span>
+                )}
+                <ShareOpportunity 
+                  title={project.project_title} 
+                  url={`/projects/${project.id}`} 
+                  type="project" 
+                />
+              </div>
             </div>
-            <p className="text-gray-600">
-              by <span className="font-medium">{project.organization_name || 'Unknown Organization'}</span>
-            </p>
           </div>
 
           {/* Key Information */}

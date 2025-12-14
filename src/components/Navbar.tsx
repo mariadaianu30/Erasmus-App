@@ -60,9 +60,9 @@ export default function Navbar() {
           
           // Try to create a basic profile if it doesn't exist
           try {
-            // Get user metadata to extract names
-            const { data: userData } = await supabase.auth.getUser()
-            const userMeta = userData?.user?.user_metadata || {}
+            // Get user metadata to extract names - use session instead of getUser()
+            const { data: { session } } = await supabase.auth.getSession()
+            const userMeta = session?.user?.user_metadata || {}
             
             // Try to insert, but if it fails due to existing profile, update instead
             const { error: insertError } = await supabase
@@ -284,9 +284,92 @@ export default function Navbar() {
     ].join(' ')
   }
 
+  const navContent = (
+    <>
+      {/* Logo */}
+      <div className="flex items-center">
+        <Link href="/" className="flex items-center group">
+          <Calendar className="h-8 w-8 text-blue-600 group-hover:text-blue-700 transition-colors duration-200" />
+          <div className="ml-2">
+            <div className="text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors duration-200">Erasmus+ Connect</div>
+            <div className="text-xs text-gray-500 -mt-1">by Scout Society</div>
+          </div>
+        </Link>
+      </div>
+
+      {/* Desktop Navigation */}
+      <div className="hidden md:flex items-center space-x-8">
+        {getNavigationItems().map((item) => (
+          <Link
+            key={item.name}
+            href={item.href}
+            className={getDesktopNavClasses(item.href)}
+          >
+            {item.name}
+          </Link>
+        ))}
+      </div>
+
+      {/* User Menu */}
+      <div className="hidden md:flex items-center space-x-4">
+        {user ? (
+          <div className="flex items-center space-x-4">
+            <Link
+              href="/profile"
+              className="flex items-center text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+            >
+              <User className="h-4 w-4 mr-2" />
+              {getDisplayName()}
+            </Link>
+            <button
+              onClick={handleSignOut}
+              disabled={signingOut}
+              className="flex items-center bg-red-50 text-red-700 hover:bg-red-100 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 border border-red-200 hover:border-red-300 disabled:opacity-50"
+            >
+              {signingOut ? (
+                <>
+                  <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-red-600 mr-2" />
+                  Signing out...
+                </>
+              ) : (
+                <>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sign Out
+                </>
+              )}
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center space-x-4">
+            <Link
+              href="/auth"
+              className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+            >
+              Login/Register
+            </Link>
+          </div>
+        )}
+      </div>
+
+      {/* Mobile menu button */}
+      <div className="md:hidden flex items-center">
+        <button
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="text-gray-700 hover:text-blue-600 p-2 rounded-md"
+        >
+          {mobileMenuOpen ? (
+            <X className="h-6 w-6" />
+          ) : (
+            <Menu className="h-6 w-6" />
+          )}
+        </button>
+      </div>
+    </>
+  )
+
   if (loading) {
     return (
-      <nav className="bg-white shadow-sm border-b">
+      <nav className="bg-white shadow-md border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
@@ -311,84 +394,7 @@ export default function Navbar() {
     <nav className="bg-white shadow-sm border-b sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-          <div className="flex items-center">
-            <Link href="/" className="flex items-center">
-              <Calendar className="h-8 w-8 text-blue-600" />
-              <div className="ml-2">
-                <div className="text-xl font-bold text-gray-900">Erasmus+ Connect</div>
-                <div className="text-xs text-gray-500 -mt-1">by Scout Society</div>
-              </div>
-            </Link>
-          </div>
-
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
-            {getNavigationItems().map((item) => (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={getDesktopNavClasses(item.href)}
-              >
-                {item.name}
-              </Link>
-            ))}
-          </div>
-
-          {/* User Menu */}
-          <div className="hidden md:flex items-center space-x-4">
-            {user ? (
-              <div className="flex items-center space-x-4">
-                <Link
-                  href="/profile"
-                  className="flex items-center text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                >
-                  <User className="h-4 w-4 mr-2" />
-                  {getDisplayName()}
-                </Link>
-                <button
-                  onClick={handleSignOut}
-                  disabled={signingOut}
-                  className="flex items-center bg-red-50 text-red-700 hover:bg-red-100 px-3 py-2 rounded-md text-sm font-medium transition-colors border border-red-200"
-                >
-                  {signingOut ? (
-                    <>
-                      <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-red-600 mr-2" />
-                      Signing out...
-                    </>
-                  ) : (
-                    <>
-                      <LogOut className="h-4 w-4 mr-2" />
-                      Sign Out
-                    </>
-                  )}
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center space-x-4">
-                <Link
-                  href="/auth"
-                  className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
-                >
-                  Login/Register
-                </Link>
-              </div>
-            )}
-          </div>
-
-          {/* Mobile menu button */}
-          <div className="md:hidden flex items-center">
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="text-gray-700 hover:text-blue-600 p-2 rounded-md"
-            >
-              {mobileMenuOpen ? (
-                <X className="h-6 w-6" />
-              ) : (
-                <Menu className="h-6 w-6" />
-              )}
-            </button>
-          </div>
+          {navContent}
         </div>
 
         {/* Mobile Navigation */}
@@ -424,7 +430,7 @@ export default function Navbar() {
                 ))}
                 
                 {!user && (
-                  <div className="border-t pt-4 mt-4">
+                  <div className="border-t border-gray-200 pt-4 mt-4">
                     <Link
                       href="/auth"
                       className="block bg-blue-600 text-white px-4 py-3 rounded-lg text-base font-medium hover:bg-blue-700 transition-colors text-center mx-3"
@@ -436,37 +442,37 @@ export default function Navbar() {
                 )}
                 
                 {user && (
-                  <div className="border-t pt-4 mt-4 space-y-2">
-                  <Link
-                    href="/profile"
-                    className="flex items-center text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-base font-medium transition-colors"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <User className="h-4 w-4 mr-2" />
-                    {getDisplayName()}
-                  </Link>
-                  <button
-                    onClick={() => {
-                      handleSignOut()
-                      setMobileMenuOpen(false)
-                    }}
-                  disabled={signingOut}
-                    className="flex items-center bg-red-50 text-red-700 hover:bg-red-100 px-3 py-2 rounded-md text-base font-medium transition-colors w-full text-left border border-red-200"
-                  >
-                  {signingOut ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600 mr-2" />
-                      Signing out...
-                    </>
-                  ) : (
-                    <>
-                      <LogOut className="h-4 w-4 mr-2" />
-                      Sign Out
-                    </>
-                  )}
-                  </button>
-                </div>
-              )}
+                  <div className="border-t border-gray-200 pt-4 mt-4 space-y-2">
+                    <Link
+                      href="/profile"
+                      className="flex items-center text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-base font-medium transition-colors"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <User className="h-4 w-4 mr-2" />
+                      {getDisplayName()}
+                    </Link>
+                    <button
+                      onClick={() => {
+                        handleSignOut()
+                        setMobileMenuOpen(false)
+                      }}
+                      disabled={signingOut}
+                      className="flex items-center bg-red-50 text-red-700 hover:bg-red-100 px-3 py-2 rounded-md text-base font-medium transition-all duration-200 w-full text-left border border-red-200 hover:border-red-300 disabled:opacity-50"
+                    >
+                      {signingOut ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600 mr-2" />
+                          Signing out...
+                        </>
+                      ) : (
+                        <>
+                          <LogOut className="h-4 w-4 mr-2" />
+                          Sign Out
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>

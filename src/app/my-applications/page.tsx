@@ -55,9 +55,12 @@ export default function MyApplicationsPage() {
 
       if (profileError && (profileError.code === 'PGRST116' || profileError.message?.includes('No rows found'))) {
         try {
-          // Get user metadata to extract names
-          const { data: userData } = await supabase.auth.getUser()
-          const userMeta = userData?.user?.user_metadata || {}
+          // Get user metadata to extract names - use getSession() to avoid AuthSessionMissingError
+          const { data: { session } } = await supabase.auth.getSession()
+          if (!session?.user) {
+            return
+          }
+          const userMeta = session.user.user_metadata || {}
           
           const { error: insertError } = await supabase
             .from('profiles')

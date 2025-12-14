@@ -154,9 +154,9 @@ export default function DashboardPage() {
 
           if (notFound) {
             try {
-              // Get user metadata to extract names
-              const { data: userData } = await supabase.auth.getUser()
-              const userMeta = userData?.user?.user_metadata || {}
+              // Get user metadata to extract names - use getSession() to avoid AuthSessionMissingError
+              const { data: { session } } = await supabase.auth.getSession()
+              const userMeta = session?.user?.user_metadata || {}
               const participantDefaults = userMeta.participant_profile_defaults || {}
               const organizationDefaults = userMeta.organization_profile_defaults || {}
               const profileType = (userMeta.user_type || 'participant') as 'participant' | 'organization'

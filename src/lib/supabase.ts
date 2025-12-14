@@ -3,8 +3,94 @@ import { createBrowserClient } from '@supabase/ssr'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+// Clean up corrupted session data from localStorage
+// This fixes the "Cannot create property 'user' on string" error
+// The error occurs when Supabase tries to recover a session that's stored as a JSON string
+// instead of a proper object, causing it to try setting .user on a string value
+if (typeof window !== 'undefined') {
+  try {
+    // Check for Supabase auth tokens in localStorage
+    const keys = Object.keys(localStorage)
+    const supabaseKeys = keys.filter(key => 
+      key.includes('supabase') || 
+      key.includes('auth-token') ||
+      key.includes('sb-') ||
+      key.startsWith('sb-')
+    )
+    
+    for (const key of supabaseKeys) {
+      try {
+        const value = localStorage.getItem(key)
+        if (value) {
+          const trimmedValue = value.trim()
+          // Check if value is a JSON string that looks like a session object
+          if (trimmedValue.startsWith('{') && trimmedValue.includes('"access_token"')) {
+            try {
+              const parsed = JSON.parse(value)
+              // If parsed is a string (double-encoded JSON), remove it
+              if (typeof parsed === 'string') {
+                console.warn(`Cleaning double-encoded Supabase storage key: ${key}`)
+                localStorage.removeItem(key)
+                continue
+              }
+              // If parsed has access_token but is missing user property (malformed session), remove it
+              // This is the exact error case: Supabase tries to set .user on a string/object without user
+              if (parsed && typeof parsed === 'object' && parsed.access_token && typeof parsed.user === 'undefined') {
+                console.warn(`Cleaning malformed Supabase session (missing user property): ${key}`)
+                localStorage.removeItem(key)
+              }
+            } catch (parseError) {
+              // If parsing fails, the data is corrupted - remove it
+              console.warn(`Removing corrupted Supabase storage key: ${key}`)
+              localStorage.removeItem(key)
+            }
+          }
+        }
+      } catch (e) {
+        // If any error occurs, remove the potentially corrupted key
+        console.warn(`Removing potentially corrupted Supabase storage key: ${key}`)
+        localStorage.removeItem(key)
+      }
+    }
+  } catch (error) {
+    console.error('Error cleaning up localStorage:', error)
+    // If cleanup itself fails, clear all Supabase keys as a fallback
+    try {
+      const allKeys = Object.keys(localStorage)
+      allKeys.forEach(key => {
+        if (key.includes('supabase') || key.includes('sb-')) {
+          localStorage.removeItem(key)
+        }
+      })
+    } catch (fallbackError) {
+      console.error('Failed to clear localStorage as fallback:', fallbackError)
+    }
+  }
+}
+
+// Helper function to create Supabase client with error handling
+function createSupabaseClient() {
+  try {
+    return createBrowserClient(supabaseUrl, supabaseAnonKey)
+  } catch (error) {
+    console.error('Error initializing Supabase client:', error)
+    // If initialization fails, clear all Supabase-related storage and retry
+    if (typeof window !== 'undefined') {
+      const keys = Object.keys(localStorage)
+      keys.forEach(key => {
+        if (key.includes('supabase') || key.includes('sb-')) {
+          localStorage.removeItem(key)
+        }
+      })
+      // Retry initialization
+      return createBrowserClient(supabaseUrl, supabaseAnonKey)
+    }
+    throw error
+  }
+}
+
 // Use createBrowserClient for proper cookie-based auth in Next.js App Router
-export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createSupabaseClient()
 
 // Database types
 export interface Database {
@@ -277,4 +363,4 @@ export interface Database {
 }
 
 // Helper functions for common operations
-export const supabaseClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey)
+export const supabaseClient = createSupabaseClient() as ReturnType<typeof createBrowserClient<Database>>

@@ -87,6 +87,19 @@ html {
     min-height: 44px;
   }
   
+  /* Better text rendering on mobile */
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  
+  /* Prevent text size adjustment on orientation change */
+  html {
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+  }
+  
   /* Reduce motion for better performance */
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
@@ -94,6 +107,68 @@ html {
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
     }
+  }
+}
+
+/* Tablet optimizations */
+@media (min-width: 769px) and (max-width: 1024px) {
+  /* Ensure proper spacing on tablets */
+  .container {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+/* Large screen optimizations */
+@media (min-width: 1920px) {
+  /* Limit max width for better readability */
+  .max-w-7xl {
+    max-width: 1400px;
+  }
+}
+
+/* Cross-browser compatibility */
+@supports (-webkit-appearance: none) {
+  /* Safari specific fixes */
+  input[type="search"] {
+    -webkit-appearance: none;
+  }
+}
+
+@supports (display: grid) {
+  /* Grid fallback for older browsers */
+  .grid {
+    display: grid;
+  }
+}
+
+/* Prevent horizontal scroll on all devices */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Better image handling */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Improve form accessibility */
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Better table responsiveness */
+@media (max-width: 768px) {
+  table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
   }
 }
 
@@ -231,4 +306,14 @@ textarea:focus-visible {
 
 .animate-float-2 {
   animation: float-2 12s ease-in-out infinite;
+}
+
+/* Shimmer animation for skeleton loaders */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }

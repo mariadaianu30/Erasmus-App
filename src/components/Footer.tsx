@@ -10,26 +10,33 @@ export default function Footer() {
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center mb-4">
               <Calendar className="h-8 w-8 text-blue-400" />
-              <span className="ml-2 text-2xl font-bold">Event Platform</span>
+              <div className="ml-2">
+                <div className="text-2xl font-bold">Erasmus+ Connect</div>
+                <div className="text-xs text-gray-400 -mt-1">by Scout Society</div>
+              </div>
             </div>
-            <p className="text-gray-300 mb-6 max-w-md">
-              Connect with events and communities. Discover, apply, and manage events all in one place. 
-              Whether you&apos;re a participant looking for events or an organization hosting experiences, 
-              we&apos;ve got you covered.
+            <p className="text-gray-300 mb-6 max-w-md leading-relaxed">
+              Connect with verified Erasmus+ events and communities across Europe. Discover transformative experiences, 
+              apply to events, and build meaningful connections. Whether you&apos;re a participant seeking opportunities 
+              or an organization hosting experiences, we&apos;ve got you covered.
             </p>
             <div className="flex space-x-4">
               <a
-                href="#"
-                className="text-gray-400 hover:text-white transition-colors"
-                aria-label="Facebook"
+                href="https://twitter.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-400 hover:text-blue-400 transition-colors duration-200"
+                aria-label="Twitter"
               >
                 <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/>
                 </svg>
               </a>
               <a
-                href="#"
-                className="text-gray-400 hover:text-white transition-colors"
+                href="https://linkedin.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-400 hover:text-blue-400 transition-colors duration-200"
                 aria-label="LinkedIn"
               >
                 <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
@@ -37,12 +44,14 @@ export default function Footer() {
                 </svg>
               </a>
               <a
-                href="#"
-                className="text-gray-400 hover:text-white transition-colors"
+                href="https://instagram.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-400 hover:text-blue-400 transition-colors duration-200"
                 aria-label="Instagram"
               >
                 <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 6.62 5.367 11.987 11.988 11.987 6.62 0 11.987-5.367 11.987-11.987C24.014 5.367 18.637.001 12.017.001zM8.449 16.988c-1.297 0-2.448-.49-3.323-1.297C4.198 14.895 3.708 13.744 3.708 12.447s.49-2.448 1.297-3.323c.875-.807 2.026-1.297 3.323-1.297s2.448.49 3.323 1.297c.807.875 1.297 2.026 1.297 3.323s-.49 2.448-1.297 3.323c-.875.807-2.026 1.297-3.323 1.297zm7.718-1.297c-.875.807-2.026 1.297-3.323 1.297s-2.448-.49-3.323-1.297c-.807-.875-1.297-2.026-1.297-3.323s.49-2.448 1.297-3.323c.875-.807 2.026-1.297 3.323-1.297s2.448.49 3.323 1.297c.807.875 1.297 2.026 1.297 3.323s-.49 2.448-1.297 3.323z"/>
+                  <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
                 </svg>
               </a>
             </div>
@@ -50,31 +59,31 @@ export default function Footer() {
 
           {/* Quick Links */}
           <div>
-            <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
-            <ul className="space-y-2">
+            <h3 className="text-lg font-bold mb-4 text-blue-400">Quick Links</h3>
+            <ul className="space-y-3">
               <li>
-                <Link href="/" className="text-gray-300 hover:text-white transition-colors">
+                <Link href="/" className="text-gray-300 hover:text-blue-400 transition-colors duration-200 inline-block">
                   Home
                 </Link>
               </li>
               <li>
-                <Link href="/events" className="text-gray-300 hover:text-white transition-colors">
+                <Link href="/events" className="text-gray-300 hover:text-blue-400 transition-colors duration-200 inline-block">
                   Events
                 </Link>
               </li>
               <li>
-                <Link href="/organizations" className="text-gray-300 hover:text-white transition-colors">
+                <Link href="/organizations" className="text-gray-300 hover:text-blue-400 transition-colors duration-200 inline-block">
                   Organizations
                 </Link>
               </li>
               <li>
-                <Link href="/about" className="text-gray-300 hover:text-white transition-colors">
-                  About
+                <Link href="/dashboard" className="text-gray-300 hover:text-blue-400 transition-colors duration-200 inline-block">
+                  Dashboard
                 </Link>
               </li>
               <li>
-                <Link href="/contact" className="text-gray-300 hover:text-white transition-colors">
-                  Contact
+                <Link href="/auth" className="text-gray-300 hover:text-blue-400 transition-colors duration-200 inline-block">
+                  Login / Register
                 </Link>
               </li>
             </ul>
@@ -82,26 +91,26 @@ export default function Footer() {
 
           {/* Support */}
           <div>
-            <h3 className="text-lg font-semibold mb-4">Support</h3>
-            <ul className="space-y-2">
+            <h3 className="text-lg font-bold mb-4 text-blue-400">Resources</h3>
+            <ul className="space-y-3">
               <li>
-                <Link href="/help" className="text-gray-300 hover:text-white transition-colors">
-                  Help Center
+                <a href="mailto:support@erasmusconnect.eu" className="text-gray-300 hover:text-blue-400 transition-colors duration-200 inline-block">
+                  Contact Support
+                </a>
+              </li>
+              <li>
+                <Link href="/events/create" className="text-gray-300 hover:text-blue-400 transition-colors duration-200 inline-block">
+                  Create Event
                 </Link>
               </li>
               <li>
-                <Link href="/faq" className="text-gray-300 hover:text-white transition-colors">
-                  FAQ
+                <Link href="/projects" className="text-gray-300 hover:text-blue-400 transition-colors duration-200 inline-block">
+                  Projects
                 </Link>
               </li>
               <li>
-                <Link href="/privacy" className="text-gray-300 hover:text-white transition-colors">
-                  Privacy Policy
-                </Link>
-              </li>
-              <li>
-                <Link href="/terms" className="text-gray-300 hover:text-white transition-colors">
-                  Terms of Service
+                <Link href="/profile" className="text-gray-300 hover:text-blue-400 transition-colors duration-200 inline-block">
+                  My Profile
                 </Link>
               </li>
             </ul>
@@ -109,31 +118,35 @@ export default function Footer() {
         </div>
 
         {/* Contact Info */}
-        <div className="border-t border-gray-800 mt-8 pt-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="flex items-center">
-              <Mail className="h-5 w-5 text-blue-400 mr-3" />
-              <span className="text-gray-300">support@eventplatform.com</span>
+        <div className="border-t border-gray-700 mt-8 pt-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="flex items-center group">
+              <Mail className="h-5 w-5 text-blue-400 mr-3 group-hover:scale-110 transition-transform" />
+              <a href="mailto:support@erasmusconnect.eu" className="text-gray-300 hover:text-blue-400 transition-colors duration-200">
+                support@erasmusconnect.eu
+              </a>
             </div>
-            <div className="flex items-center">
-              <Phone className="h-5 w-5 text-blue-400 mr-3" />
-              <span className="text-gray-300">+40757574545</span>
+            <div className="flex items-center group">
+              <Phone className="h-5 w-5 text-blue-400 mr-3 group-hover:scale-110 transition-transform" />
+              <a href="tel:+40757574545" className="text-gray-300 hover:text-blue-400 transition-colors duration-200">
+                +40 757 574 545
+              </a>
             </div>
             <div className="flex items-center">
               <MapPin className="h-5 w-5 text-blue-400 mr-3" />
-              <span className="text-gray-300">Bucharest, RO</span>
+              <span className="text-gray-300">Bucharest, Romania</span>
             </div>
           </div>
         </div>
 
         {/* Copyright */}
-        <div className="border-t border-gray-800 mt-8 pt-8">
+        <div className="border-t border-gray-700 mt-8 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-400 text-sm">
-              © 2024 Event Platform. All rights reserved.
+              © {new Date().getFullYear()} Erasmus+ Connect by Scout Society. All rights reserved.
             </p>
             <p className="text-gray-400 text-sm mt-2 md:mt-0">
-              Built with ❤️ for the community
+              Built with ❤️ for the European community
             </p>
           </div>
         </div>

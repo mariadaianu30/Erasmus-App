@@ -426,16 +426,14 @@ export default function CreateEventPage() {
         uploadedPhotoUrl = publicData.publicUrl
       }
 
-      // Verify user is authenticated and refresh session
-      const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser()
-      if (authError || !currentUser) {
+      // Verify user is authenticated - use getSession() to avoid AuthSessionMissingError
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      const currentUser = session?.user
+      if (sessionError || !currentUser) {
         setError('You are not logged in. Please log in and try again.')
         setSaving(false)
         return
       }
-
-      // Refresh session to ensure auth token is valid
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
       if (sessionError || !session) {
         setError('Session expired. Please log in again.')
         setSaving(false)
