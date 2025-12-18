@@ -3,14 +3,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { 
-  Calendar, 
-  MapPin, 
-  Users, 
-  Clock, 
-  ArrowLeft, 
-  Globe, 
-  User, 
+import {
+  Calendar,
+  MapPin,
+  Users,
+  Clock,
+  ArrowLeft,
+  Globe,
+  User,
   CheckCircle,
   XCircle,
   AlertCircle,
@@ -113,7 +113,7 @@ export default function EventDetailsPage() {
     const ensureOwnership = async () => {
       // Only run if we have the necessary data
       if (!event || !user || loading) return
-      
+
       const normalizeOrgName = (value?: string | null) =>
         value?.trim().toLowerCase().replace(/\s+/g, ' ') || null
 
@@ -153,12 +153,12 @@ export default function EventDetailsPage() {
         .single()
 
       if (error) throw error
-      
+
       if (!data) {
         router.push('/events')
         return
       }
-      
+
       // Fetch organization name if organization_id exists
       if (data.organization_id) {
         const { data: profile, error: profileError } = await supabase
@@ -166,14 +166,14 @@ export default function EventDetailsPage() {
           .select('organization_name, website')
           .eq('id', data.organization_id)
           .single()
-        
+
         // Handle profile fetch errors gracefully (profile might not exist)
         if (!profileError && profile) {
           data.organization_name = profile.organization_name || null
           data.organization_website = profile.website || null
         }
       }
-      
+
       setEvent(data)
     } catch (error) {
       console.error('Error fetching event:', error)
@@ -187,14 +187,14 @@ export default function EventDetailsPage() {
     try {
       // Use getSession() instead of getUser() to avoid AuthSessionMissingError
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-      
+
       if (sessionError) {
         console.error('Error getting session:', sessionError)
         setUser(null)
         setUserProfile(null)
         return
       }
-      
+
       const user = session?.user || null
       setUser(user)
 
@@ -247,10 +247,10 @@ export default function EventDetailsPage() {
     }
 
     setApplying(true)
-    
+
     // Create a timeout promise
     const timeoutPromise = new Promise((_, reject) => {
-      const timeout =       setTimeout(() => {
+      const timeout = setTimeout(() => {
         reject(new Error('Request timed out. Please try again.'))
       }, 15000) // 15 second timeout
       setTimeoutId(timeout)
@@ -278,12 +278,12 @@ export default function EventDetailsPage() {
       await checkUser()
       setShowApplyForm(false)
       setMotivationLetter('')
-      
+
       // Show success message
       setToast({ message: 'Application submitted successfully! The organization will review your application.', type: 'success' })
     } catch (error: any) {
       console.error('Error applying:', error)
-      
+
       // Provide more specific error messages
       if (error?.message?.includes('timed out')) {
         setToast({ message: 'Request timed out. Please check your connection and try again.', type: 'error' })
@@ -575,13 +575,12 @@ export default function EventDetailsPage() {
       {toast && (
         <div className="fixed top-4 right-4 z-50 animate-slide-in">
           <div
-            className={`flex items-center gap-3 px-6 py-4 rounded-lg shadow-lg max-w-md ${
-              toast.type === 'success'
+            className={`flex items-center gap-3 px-6 py-4 rounded-lg shadow-lg max-w-md ${toast.type === 'success'
                 ? 'bg-green-50 border border-green-200 text-green-800'
                 : toast.type === 'error'
-                ? 'bg-red-50 border border-red-200 text-red-800'
-                : 'bg-blue-50 border border-blue-200 text-blue-800'
-            }`}
+                  ? 'bg-red-50 border border-red-200 text-red-800'
+                  : 'bg-blue-50 border border-blue-200 text-blue-800'
+              }`}
           >
             {toast.type === 'success' ? (
               <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
@@ -603,8 +602,8 @@ export default function EventDetailsPage() {
       )}
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Back Button */}
-        <Link 
-          href="/events" 
+        <Link
+          href="/events"
           className="inline-flex items-center text-blue-600 hover:text-blue-700 mb-6"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
@@ -618,16 +617,17 @@ export default function EventDetailsPage() {
               {/* Event Photo - Hero Image */}
               {event.photo_url && (
                 <div className="relative w-full h-[280px] sm:h-[360px] lg:h-[420px] overflow-hidden bg-gray-100">
-                  <Image 
-                    src={event.photo_url} 
+                  <Image
+                    src={event.photo_url}
                     alt={event.title}
                     fill
                     className="object-cover"
                     unoptimized
+                    priority
                   />
                 </div>
               )}
-              
+
               <div className="p-4 sm:p-6">
                 {/* Event Header */}
                 <div className="mb-6">
@@ -643,68 +643,68 @@ export default function EventDetailsPage() {
                       )}
                     </div>
                     <div className="flex-shrink-0">
-                      <ShareOpportunity 
-                        title={event.title} 
-                        url={`/events/${event.id}`} 
-                        type="event" 
+                      <ShareOpportunity
+                        title={event.title}
+                        url={`/events/${event.id}`}
+                        type="event"
                       />
                     </div>
                   </div>
 
                   {canManageEvent && (
-                  <>
-                    <div className="flex flex-wrap gap-2 sm:gap-3 mb-4">
-                      <button
-                        onClick={handleOpenAcceptedModal}
-                        className="inline-flex items-center gap-2 border border-blue-200 text-blue-700 font-semibold px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
-                      >
-                        <Users className="h-4 w-4" />
-                        List Accepted Participants
-                      </button>
-                      <button
-                        onClick={handleExportParticipantsCsv}
-                        disabled={exportingParticipants}
-                        className="inline-flex items-center gap-2 bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                      >
-                        {exportingParticipants ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                            Preparing CSV...
-                          </>
-                        ) : (
-                          <>
-                            <Download className="h-4 w-4" />
-                            Export Accepted as CSV
-                          </>
-                        )}
-                      </button>
-                      <Link
-                        href={`/events/edit/${event.id}`}
-                        prefetch={false}
-                        className="inline-flex items-center gap-2 border border-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
-                      >
-                        <Edit className="h-4 w-4" />
-                        Edit Event
-                      </Link>
-                      <button
-                        onClick={handleDeleteEvent}
-                        disabled={deletingEvent}
-                        className="inline-flex items-center gap-2 border border-red-300 text-red-700 font-semibold px-4 py-2 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                      >
-                        {deletingEvent ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600" />
-                            Deleting...
-                          </>
-                        ) : (
-                          <>
-                            <Trash2 className="h-4 w-4" />
-                            Delete Event
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </>
+                    <>
+                      <div className="flex flex-wrap gap-2 sm:gap-3 mb-4">
+                        <button
+                          onClick={handleOpenAcceptedModal}
+                          className="inline-flex items-center gap-2 border border-blue-200 text-blue-700 font-semibold px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
+                        >
+                          <Users className="h-4 w-4" />
+                          List Accepted Participants
+                        </button>
+                        <button
+                          onClick={handleExportParticipantsCsv}
+                          disabled={exportingParticipants}
+                          className="inline-flex items-center gap-2 bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {exportingParticipants ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                              Preparing CSV...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="h-4 w-4" />
+                              Export Accepted as CSV
+                            </>
+                          )}
+                        </button>
+                        <Link
+                          href={`/events/edit/${event.id}`}
+                          prefetch={false}
+                          className="inline-flex items-center gap-2 border border-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+                        >
+                          <Edit className="h-4 w-4" />
+                          Edit Event
+                        </Link>
+                        <button
+                          onClick={handleDeleteEvent}
+                          disabled={deletingEvent}
+                          className="inline-flex items-center gap-2 border border-red-300 text-red-700 font-semibold px-4 py-2 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {deletingEvent ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600" />
+                              Deleting...
+                            </>
+                          ) : (
+                            <>
+                              <Trash2 className="h-4 w-4" />
+                              Delete Event
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </>
                   )}
                 </div>
 
@@ -720,7 +720,7 @@ export default function EventDetailsPage() {
                       </div>
                     </div>
                   )}
-                  
+
                   {/* 3. Begin date - end date */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="flex items-center text-gray-600">
@@ -738,7 +738,7 @@ export default function EventDetailsPage() {
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* 4. Venue place - city */}
                   {(event.venue_place || event.city) && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -762,7 +762,7 @@ export default function EventDetailsPage() {
                       )}
                     </div>
                   )}
-                  
+
                   {/* 5. Country */}
                   {event.country && (
                     <div className="flex items-center text-gray-600">
@@ -773,7 +773,7 @@ export default function EventDetailsPage() {
                       </div>
                     </div>
                   )}
-                  
+
                   {/* 11. Group Size */}
                   {event.group_size && (
                     <div className="flex items-center text-gray-600">
@@ -918,7 +918,7 @@ export default function EventDetailsPage() {
               <div className="flex-1">
                 <h4 className="font-medium text-gray-900">{event.organization_name}</h4>
                 {event.organization_website && (
-                  <a 
+                  <a
                     href={event.organization_website}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -934,154 +934,154 @@ export default function EventDetailsPage() {
 
           {/* Application Section */}
           <div className="bg-white rounded-lg shadow-sm border p-6">
-                {!user ? (
-                  <div className="text-center">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Apply to This Event</h3>
-                    <p className="text-gray-600 mb-4">Sign in to apply for this opportunity</p>
-                    <Link 
-                      href="/auth" 
-                      className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors text-center block"
-                    >
-                      Sign In to Apply
-                    </Link>
-                  </div>
-                ) : userProfile?.user_type === 'organization' ? (
-                  canManageEvent ? (
-                    <div className="text-center">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-3">Organization View</h3>
-                      <p className="text-gray-600 mb-4">
-                        Use the management buttons near the event title to list and export accepted participants.
-                      </p>
-                      <Link 
-                        href="/dashboard/organization" 
-                        className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors text-center block"
-                      >
-                        Go to Dashboard
-                      </Link>
-                    </div>
-                  ) : (
-                    <div className="text-center">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-3">Organization View</h3>
-                      <p className="text-gray-600 mb-4">
-                        You&apos;re viewing an event managed by {event.organization_name}. Only that organization can view accepted participants.
-                      </p>
-                      <Link 
-                        href="/dashboard/organization" 
-                        className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors text-center block"
-                      >
-                        Go to Dashboard
-                      </Link>
-                    </div>
-                  )
-                ) : application ? (
-                  <div className="text-center">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Application Status</h3>
-                    <div className="flex items-center justify-center mb-4">
-                      {getStatusIcon(application.status)}
-                      <span className={`ml-2 px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(application.status)}`}>
-                        {application.status === 'pending' ? 'Under Review' : 
-                         application.status === 'accepted' ? 'Accepted!' : 
-                         'Not Selected'}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-600 mb-2">
-                      Applied on {formatDate(application.created_at)}
-                    </p>
-                    {application.status === 'pending' && (
-                      <p className="text-sm text-blue-600 mb-4">
-                        Your application is being reviewed by the organization.
-                      </p>
-                    )}
-                    {application.status === 'accepted' && (
-                      <p className="text-sm text-green-600 mb-4">
-                        🎉 Congratulations! You&apos;ve been accepted to this event.
-                      </p>
-                    )}
-                    {application.status === 'rejected' && (
-                      <p className="text-sm text-gray-600 mb-4">
-                        Thank you for your interest. Keep applying to other events!
-                      </p>
-                    )}
-                    <Link 
-                      href="/my-applications" 
-                      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                    >
-                      View All My Applications →
-                    </Link>
-                  </div>
-                ) : showApplyForm ? (
-                  <form onSubmit={handleApply} className="space-y-6">
-                    <div>
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">Apply to This Event</h3>
-                      <p className="text-sm text-gray-600">
-                        Write a motivation letter explaining why you want to participate in this event
-                      </p>
-                    </div>
-                    
-                    <div>
-                      <label htmlFor="motivation-letter" className="block text-sm font-medium text-gray-700 mb-2">
-                        Motivation Letter *
-                      </label>
-                      <textarea
-                        id="motivation-letter"
-                        value={motivationLetter}
-                        onChange={(e) => setMotivationLetter(e.target.value)}
-                        rows={8}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y transition-colors"
-                        placeholder="I am very interested in this opportunity because..."
-                        required
-                      />
-                      <p className="text-xs text-gray-500 mt-2">
-                        Write a brief motivation letter explaining your interest and why you&apos;re a good fit for this event
-                      </p>
-                    </div>
-
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                      <p className="text-sm text-blue-800">
-                        💡 <strong>Tip:</strong> Mention your relevant experience, what you hope to learn, 
-                        and how this opportunity aligns with your goals.
-                      </p>
-                    </div>
-                    
-                    <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                      <button
-                        type="submit"
-                        disabled={applying || motivationLetter.trim().length === 0}
-                        className="flex-1 bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-h-[48px]"
-                      >
-                        {applying ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                            Submitting...
-                          </>
-                        ) : (
-                          'Submit Application'
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleCancelApply}
-                        disabled={applying}
-                        className="px-6 py-3 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px] sm:w-auto w-full"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
-                ) : (
-                  <div className="text-center">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Apply to This Event</h3>
-                    <p className="text-gray-600 mb-4">
-                      Ready to join this amazing opportunity?
-                    </p>
-                    <button
-                      onClick={() => setShowApplyForm(true)}
-                      className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors"
-                    >
-                      Apply Now
-                    </button>
-                  </div>
+            {!user ? (
+              <div className="text-center">
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Apply to This Event</h3>
+                <p className="text-gray-600 mb-4">Sign in to apply for this opportunity</p>
+                <Link
+                  href="/auth"
+                  className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors text-center block"
+                >
+                  Sign In to Apply
+                </Link>
+              </div>
+            ) : userProfile?.user_type === 'organization' ? (
+              canManageEvent ? (
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Organization View</h3>
+                  <p className="text-gray-600 mb-4">
+                    Use the management buttons near the event title to list and export accepted participants.
+                  </p>
+                  <Link
+                    href="/dashboard/organization"
+                    className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors text-center block"
+                  >
+                    Go to Dashboard
+                  </Link>
+                </div>
+              ) : (
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Organization View</h3>
+                  <p className="text-gray-600 mb-4">
+                    You&apos;re viewing an event managed by {event.organization_name}. Only that organization can view accepted participants.
+                  </p>
+                  <Link
+                    href="/dashboard/organization"
+                    className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors text-center block"
+                  >
+                    Go to Dashboard
+                  </Link>
+                </div>
+              )
+            ) : application ? (
+              <div className="text-center">
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Application Status</h3>
+                <div className="flex items-center justify-center mb-4">
+                  {getStatusIcon(application.status)}
+                  <span className={`ml-2 px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(application.status)}`}>
+                    {application.status === 'pending' ? 'Under Review' :
+                      application.status === 'accepted' ? 'Accepted!' :
+                        'Not Selected'}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-600 mb-2">
+                  Applied on {formatDate(application.created_at)}
+                </p>
+                {application.status === 'pending' && (
+                  <p className="text-sm text-blue-600 mb-4">
+                    Your application is being reviewed by the organization.
+                  </p>
                 )}
+                {application.status === 'accepted' && (
+                  <p className="text-sm text-green-600 mb-4">
+                    🎉 Congratulations! You&apos;ve been accepted to this event.
+                  </p>
+                )}
+                {application.status === 'rejected' && (
+                  <p className="text-sm text-gray-600 mb-4">
+                    Thank you for your interest. Keep applying to other events!
+                  </p>
+                )}
+                <Link
+                  href="/my-applications"
+                  className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                >
+                  View All My Applications →
+                </Link>
+              </div>
+            ) : showApplyForm ? (
+              <form onSubmit={handleApply} className="space-y-6">
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Apply to This Event</h3>
+                  <p className="text-sm text-gray-600">
+                    Write a motivation letter explaining why you want to participate in this event
+                  </p>
+                </div>
+
+                <div>
+                  <label htmlFor="motivation-letter" className="block text-sm font-medium text-gray-700 mb-2">
+                    Motivation Letter *
+                  </label>
+                  <textarea
+                    id="motivation-letter"
+                    value={motivationLetter}
+                    onChange={(e) => setMotivationLetter(e.target.value)}
+                    rows={8}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y transition-colors"
+                    placeholder="I am very interested in this opportunity because..."
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-2">
+                    Write a brief motivation letter explaining your interest and why you&apos;re a good fit for this event
+                  </p>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-800">
+                    💡 <strong>Tip:</strong> Mention your relevant experience, what you hope to learn,
+                    and how this opportunity aligns with your goals.
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  <button
+                    type="submit"
+                    disabled={applying || motivationLetter.trim().length === 0}
+                    className="flex-1 bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-h-[48px]"
+                  >
+                    {applying ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Submitting...
+                      </>
+                    ) : (
+                      'Submit Application'
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelApply}
+                    disabled={applying}
+                    className="px-6 py-3 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px] sm:w-auto w-full"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="text-center">
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Apply to This Event</h3>
+                <p className="text-gray-600 mb-4">
+                  Ready to join this amazing opportunity?
+                </p>
+                <button
+                  onClick={() => setShowApplyForm(true)}
+                  className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                >
+                  Apply Now
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

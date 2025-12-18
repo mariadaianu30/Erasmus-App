@@ -27,12 +27,12 @@ export default function AuthPage() {
     role_in_project: '' as 'participant' | 'group leader' | 'trainer or facilitator' | '',
     has_fewer_opportunities: false,
     fewer_opportunities_categories: [] as string[],
-    languages: [] as Array<{language: string, level: string}>,
+    languages: [] as Array<{ language: string, level: string }>,
     participant_target_groups: [] as string[]
   })
   const [newLanguage, setNewLanguage] = useState({ language: '', level: '' })
   const [newCitizenship, setNewCitizenship] = useState('')
-  
+
   const genderOptions = ['female', 'male', 'undefined']
   const roleOptions = ['participant', 'group leader', 'trainer or facilitator']
   const fewerOpportunitiesOptions = [
@@ -80,7 +80,7 @@ export default function AuthPage() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
     const checked = (e.target as HTMLInputElement).checked
-    
+
     setFormData(prev => {
       if (type === 'checkbox') {
         if (name === 'has_fewer_opportunities') {
@@ -246,23 +246,23 @@ export default function AuthPage() {
       const participantProfileDefaults =
         formData.userType === 'participant'
           ? {
-              first_name: formattedFirstName,
-              last_name: formattedLastName,
-              email: formData.email,
-              birth_date: birthDateValue,
-              location: formData.location.trim(),
-              gender: formData.gender || null,
-              nationality: formData.nationality.trim() || null,
-              citizenships: formData.citizenships.length > 0 ? formData.citizenships : null,
-              residency_country: formData.residency_country.trim() || null,
-              role_in_project: formData.role_in_project || null,
-              has_fewer_opportunities: formData.has_fewer_opportunities,
-              fewer_opportunities_categories:
-                formData.fewer_opportunities_categories.length > 0 ? formData.fewer_opportunities_categories : null,
-              languages: formData.languages.length > 0 ? formData.languages : null,
-              participant_target_groups:
-                formData.participant_target_groups.length > 0 ? formData.participant_target_groups : null,
-            }
+            first_name: formattedFirstName,
+            last_name: formattedLastName,
+            email: formData.email,
+            birth_date: birthDateValue,
+            location: formData.location.trim(),
+            gender: formData.gender || null,
+            nationality: formData.nationality.trim() || null,
+            citizenships: formData.citizenships.length > 0 ? formData.citizenships : null,
+            residency_country: formData.residency_country.trim() || null,
+            role_in_project: formData.role_in_project || null,
+            has_fewer_opportunities: formData.has_fewer_opportunities,
+            fewer_opportunities_categories:
+              formData.fewer_opportunities_categories.length > 0 ? formData.fewer_opportunities_categories : null,
+            languages: formData.languages.length > 0 ? formData.languages : null,
+            participant_target_groups:
+              formData.participant_target_groups.length > 0 ? formData.participant_target_groups : null,
+          }
           : null
 
       const metadata: Record<string, unknown> = {
@@ -275,15 +275,16 @@ export default function AuthPage() {
         organization_profile_defaults:
           formData.userType === 'organization'
             ? {
-                organization_name: formattedOrgName || '',
-                email: formData.email,
-                location: formData.location.trim(),
-              }
+              organization_name: formattedOrgName || '',
+              email: formData.email,
+              location: formData.location.trim(),
+            }
             : null,
       }
 
       // Registration logic
       try {
+        console.log('[AUTH] Starting registration for:', formData.userType, formData.email)
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: formData.email,
           password: formData.password,
@@ -292,29 +293,36 @@ export default function AuthPage() {
           },
         })
 
+        console.log('[AUTH] SignUp response received')
+
         if (authError) {
+          console.error('[AUTH] SignUp error:', authError.message)
           setError(authError.message)
           setLoading(false)
           return
         }
 
         let hasActiveSession = !!authData.session
+        console.log('[AUTH] Has active session after signup:', hasActiveSession)
 
         if (!hasActiveSession) {
+          console.log('[AUTH] No active session, attempting auto sign-in')
           const { error: autoSignInError, data: signInData } = await supabase.auth.signInWithPassword({
             email: formData.email,
             password: formData.password,
           })
 
           if (autoSignInError) {
-            console.warn('Auto sign-in after registration failed:', autoSignInError)
+            console.warn('[AUTH] Auto sign-in failed:', autoSignInError.message)
           } else if (signInData.session) {
             hasActiveSession = true
+            console.log('[AUTH] Auto sign-in successful')
           }
         }
 
         // Create profile with all participant fields
         if (authData.user && hasActiveSession && formData.userType === 'participant') {
+          console.log('[AUTH] Creating participant profile')
           const profileData: Record<string, unknown> = {
             id: authData.user.id,
             user_type: 'participant',
@@ -339,9 +347,14 @@ export default function AuthPage() {
             .upsert(profileData)
 
           if (profileError) {
-            console.warn('Profile creation deferred:', profileError)
+            console.error('[AUTH] Participant profile creation failed:', profileError.message)
+            setError(`Failed to create profile: ${profileError.message}`)
+            setLoading(false)
+            return
           }
+          console.log('[AUTH] Participant profile created successfully')
         } else if (authData.user && hasActiveSession && formData.userType === 'organization') {
+          console.log('[AUTH] Creating organization profile')
           const organizationProfile = {
             id: authData.user.id,
             user_type: 'organization',
@@ -358,21 +371,32 @@ export default function AuthPage() {
             .upsert(organizationProfile)
 
           if (profileError) {
-            console.warn('Profile creation deferred:', profileError)
+            console.error('[AUTH] Organization profile creation failed:', profileError.message)
+            setError(`Failed to create organization profile: ${profileError.message}`)
+            setLoading(false)
+            return
           }
+          console.log('[AUTH] Organization profile created successfully')
         }
 
+        // Handle case where email confirmation is required
         if (authData.user && !hasActiveSession) {
-          console.info('Profile creation deferred until email confirmation/completion.')
+          console.info('[AUTH] Email confirmation required')
+          setError('Please check your email to confirm your account.')
+          setLoading(false)
+          return
         }
 
         const postSignUpDestination =
           formData.userType === 'participant' ? '/dashboard' : '/dashboard/organization'
 
+        console.log('[AUTH] Registration successful, redirecting to:', postSignUpDestination)
         router.push(postSignUpDestination)
         router.refresh()
-      } catch {
-        setError('An unexpected error occurred')
+      } catch (err) {
+        console.error('[AUTH] Unexpected registration error:', err)
+        const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred during registration'
+        setError(errorMessage)
       } finally {
         setLoading(false)
       }
@@ -470,14 +494,14 @@ export default function AuthPage() {
             )}
           </p>
         </div>
-        
+
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">
               {error}
             </div>
           )}
-          
+
           <div className="space-y-4">
             {/* User Type Selection (only for registration) */}
             {!isLogin && (
@@ -486,11 +510,10 @@ export default function AuthPage() {
                   I am a:
                 </label>
                 <div className="grid grid-cols-2 gap-4">
-                  <label className={`relative flex items-center p-4 border rounded-lg cursor-pointer ${
-                    formData.userType === 'participant' 
-                      ? 'border-blue-500 bg-blue-50' 
+                  <label className={`relative flex items-center p-4 border rounded-lg cursor-pointer ${formData.userType === 'participant'
+                      ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-300 hover:border-gray-400'
-                  }`}>
+                    }`}>
                     <input
                       type="radio"
                       name="userType"
@@ -504,12 +527,11 @@ export default function AuthPage() {
                       <span className="text-sm font-medium">Participant</span>
                     </div>
                   </label>
-                  
-                  <label className={`relative flex items-center p-4 border rounded-lg cursor-pointer ${
-                    formData.userType === 'organization' 
-                      ? 'border-blue-500 bg-blue-50' 
+
+                  <label className={`relative flex items-center p-4 border rounded-lg cursor-pointer ${formData.userType === 'organization'
+                      ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-300 hover:border-gray-400'
-                  }`}>
+                    }`}>
                     <input
                       type="radio"
                       name="userType"
@@ -621,7 +643,7 @@ export default function AuthPage() {
                 {/* Additional Participant Information Section */}
                 <div className="border-t pt-4 mt-4">
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">Additional Information</h3>
-                  
+
                   {/* Gender */}
                   <div className="mb-4">
                     <label htmlFor="gender" className="block text-sm font-medium text-gray-700 mb-1">
@@ -817,7 +839,7 @@ export default function AuthPage() {
                       />
                       <span className="text-sm text-gray-700">Participant with fewer opportunities</span>
                     </label>
-                    
+
                     {formData.has_fewer_opportunities && (
                       <div className="ml-6 mt-2 p-3 bg-gray-50 rounded-lg">
                         <label className="block text-xs font-medium text-gray-700 mb-2">

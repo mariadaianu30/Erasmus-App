@@ -84,7 +84,7 @@ export default function DashboardPage() {
     role_in_project: '' as 'participant' | 'group leader' | 'trainer or facilitator' | '',
     has_fewer_opportunities: false,
     fewer_opportunities_categories: [] as string[],
-    languages: [] as Array<{language: string, level: string}>,
+    languages: [] as Array<{ language: string, level: string }>,
     participant_target_groups: [] as string[]
   })
   const [newLanguage, setNewLanguage] = useState({ language: '', level: '' })
@@ -125,20 +125,20 @@ export default function DashboardPage() {
     const getSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession()
-        
+
         if (error) {
           console.error('Session error:', error)
           router.push('/auth')
           return
         }
-        
+
         if (!session?.user) {
           router.push('/auth')
           return
         }
 
         setUser(session.user)
-        
+
         // Fetch user profile with all fields
         let { data: profileData, error: profileError } = await supabase
           .from('profiles')
@@ -155,8 +155,15 @@ export default function DashboardPage() {
           if (notFound) {
             try {
               // Get user metadata to extract names - use getSession() to avoid AuthSessionMissingError
-              const { data: { session } } = await supabase.auth.getSession()
-              const userMeta = session?.user?.user_metadata || {}
+              const { data: { session: retrySession } } = await supabase.auth.getSession()
+
+              if (!retrySession?.user) {
+                console.error('No session available for profile creation')
+                setLoading(false)
+                return
+              }
+
+              const userMeta = retrySession.user.user_metadata || {}
               const participantDefaults = userMeta.participant_profile_defaults || {}
               const organizationDefaults = userMeta.organization_profile_defaults || {}
               const profileType = (userMeta.user_type || 'participant') as 'participant' | 'organization'
@@ -168,11 +175,11 @@ export default function DashboardPage() {
                 new Date(Date.now() - 18 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
               const baseProfile: any = {
-                id: session.user.id,
+                id: retrySession.user.id,
                 user_type: profileType,
                 first_name: participantDefaults.first_name ?? userMeta.first_name ?? '',
                 last_name: participantDefaults.last_name ?? userMeta.last_name ?? '',
-                email: participantDefaults.email ?? session.user.email ?? userMeta.email ?? '',
+                email: participantDefaults.email ?? retrySession.user.email ?? userMeta.email ?? '',
                 location:
                   profileType === 'participant'
                     ? participantDefaults.location ?? userMeta.location ?? ''
@@ -197,11 +204,11 @@ export default function DashboardPage() {
                 baseProfile.bio = organizationDefaults.bio ?? ''
                 baseProfile.website = organizationDefaults.website ?? ''
               }
-              
+
               const { error: insertError } = await supabase
                 .from('profiles')
                 .upsert(baseProfile)
-              
+
               if (insertError) {
                 console.warn('Profile insert deferred:', insertError)
               }
@@ -214,7 +221,7 @@ export default function DashboardPage() {
                 ...prev,
                 first_name: profileData.first_name || '',
                 last_name: profileData.last_name || '',
-                email: profileData.email || session.user.email || '',
+                email: profileData.email || retrySession.user.email || '',
                 birth_date: profileData.birth_date || profileData.birthdate || prev.birth_date,
                 nationality: profileData.nationality || prev.nationality,
                 residency_country: profileData.residency_country || prev.residency_country,
@@ -223,7 +230,7 @@ export default function DashboardPage() {
               }))
 
               // Kick off a background refresh to hydrate the rest
-              fetchApplications(session.user.id)
+              fetchApplications(retrySession.user.id)
               setLoading(false)
               return
             } catch (createError) {
@@ -238,19 +245,19 @@ export default function DashboardPage() {
 
         if (profileData) {
           setProfile(profileData)
-          
+
           // Redirect organizations to their dashboard
           if (profileData.user_type === 'organization') {
             router.push('/dashboard/organization')
             return
           }
-          
+
           // Populate profile form
           const languages = Array.isArray(profileData.languages) ? profileData.languages : []
           const citizenships = Array.isArray(profileData.citizenships) ? profileData.citizenships : []
           const fewerOpps = Array.isArray(profileData.fewer_opportunities_categories) ? profileData.fewer_opportunities_categories : []
           const targetGroups = Array.isArray(profileData.participant_target_groups) ? profileData.participant_target_groups : []
-          
+
           setProfileForm({
             first_name: profileData.first_name || '',
             last_name: profileData.last_name || '',
@@ -269,7 +276,7 @@ export default function DashboardPage() {
             languages: languages,
             participant_target_groups: targetGroups
           })
-          
+
           // Fetch applications for participants
           if (profileData.user_type === 'participant') {
             await fetchApplications(session.user.id)
@@ -288,9 +295,9 @@ export default function DashboardPage() {
 
   const fetchApplications = async (userId: string) => {
     try {
-        const { data, error } = await supabase
-          .from('applications')
-          .select(`
+      const { data, error } = await supabase
+        .from('applications')
+        .select(`
             id,
             status,
             created_at,
@@ -304,8 +311,8 @@ export default function DashboardPage() {
               organization_id
             )
           `)
-          .eq('participant_id', userId)
-          .order('created_at', { ascending: false })
+        .eq('participant_id', userId)
+        .order('created_at', { ascending: false })
 
       if (error) {
         console.log('Applications query error:', error)
@@ -327,15 +334,15 @@ export default function DashboardPage() {
           .map((app: any) => app.events?.organization_id)
           .filter(Boolean)
       )]
-      
+
       const organizationMap: Record<string, string> = {}
-      
+
       if (organizationIds.length > 0) {
         const { data: profiles } = await supabase
           .from('profiles')
           .select('id, organization_name')
           .in('id', organizationIds)
-        
+
         if (profiles) {
           profiles.forEach((profile: any) => {
             organizationMap[profile.id] = profile.organization_name || null
@@ -348,7 +355,7 @@ export default function DashboardPage() {
         ...app,
         events: app.events ? {
           ...app.events,
-          organization_name: app.events.organization_id 
+          organization_name: app.events.organization_id
             ? (organizationMap[app.events.organization_id] || null)
             : null
         } : null
@@ -357,7 +364,7 @@ export default function DashboardPage() {
       console.log('Applications fetched successfully:', applicationsWithOrgNames)
       console.log('Number of applications:', applicationsWithOrgNames?.length || 0)
       setApplications((applicationsWithOrgNames as unknown as Application[]) || [])
-      
+
       // Calculate stats
       const stats = {
         total: applicationsWithOrgNames?.length || 0,
@@ -452,14 +459,14 @@ export default function DashboardPage() {
       } else {
         setProfileUpdateMessage('Profile updated successfully!')
         setIsEditingProfile(false)
-        
+
         // Refresh profile data
         const { data: updatedProfile } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
           .single()
-        
+
         if (updatedProfile) {
           setProfile(updatedProfile)
         }
@@ -475,7 +482,7 @@ export default function DashboardPage() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
     const checked = (e.target as HTMLInputElement).checked
-    
+
     setProfileForm(prev => {
       if (type === 'checkbox') {
         if (name === 'has_fewer_opportunities') {
@@ -539,7 +546,7 @@ export default function DashboardPage() {
       const citizenships = Array.isArray(profile.citizenships) ? profile.citizenships : []
       const fewerOpps = Array.isArray(profile.fewer_opportunities_categories) ? profile.fewer_opportunities_categories : []
       const targetGroups = Array.isArray(profile.participant_target_groups) ? profile.participant_target_groups : []
-      
+
       setProfileForm({
         first_name: profile.first_name || '',
         last_name: profile.last_name || '',
@@ -625,51 +632,51 @@ export default function DashboardPage() {
     if (profile.user_type === 'organization') {
       return profile.organization_name || 'Organization'
     }
-    
+
     // For participants, try to get a meaningful display name
     const firstName = profile.first_name?.trim() || ''
     const lastName = profile.last_name?.trim() || ''
-    
+
     // Check if names are empty or default values
-    const isEmptyName = (!firstName || firstName.trim() === '' || firstName === 'User') && 
-                       (!lastName || lastName.trim() === '' || lastName === 'User')
-    
+    const isEmptyName = (!firstName || firstName.trim() === '' || firstName === 'User') &&
+      (!lastName || lastName.trim() === '' || lastName === 'User')
+
     if (isEmptyName) {
       // If names are empty, extract from email
       if (user.email) {
         const emailName = user.email.split('@')[0]
         // Capitalize first letter and replace dots/underscores with spaces
-        return emailName.replace(/[._]/g, ' ').split(' ').map(word => 
+        return emailName.replace(/[._]/g, ' ').split(' ').map(word =>
           word.charAt(0).toUpperCase() + word.slice(1)
         ).join(' ')
       }
       return 'User'
     }
-    
+
     // If we have both names, show full name
     if (firstName && lastName) {
       return `${firstName} ${lastName}`
     }
-    
+
     // If we have only first name, show it
     if (firstName) {
       return firstName
     }
-    
+
     // If we have only last name, show it
     if (lastName) {
       return lastName
     }
-    
+
     // Extract name from email if possible (before @)
     if (user.email) {
       const emailName = user.email.split('@')[0]
       // Capitalize first letter and replace dots/underscores with spaces
-      return emailName.replace(/[._]/g, ' ').split(' ').map(word => 
+      return emailName.replace(/[._]/g, ' ').split(' ').map(word =>
         word.charAt(0).toUpperCase() + word.slice(1)
       ).join(' ')
     }
-    
+
     // Final fallback
     return 'User'
   }
@@ -685,7 +692,7 @@ export default function DashboardPage() {
                 Welcome back, {getDisplayName()}!
               </h1>
               <p className="text-gray-600 mt-2">
-                {profile.user_type === 'participant' 
+                {profile.user_type === 'participant'
                   ? 'Discover and apply to amazing events'
                   : 'Manage your events and applications'
                 }
@@ -725,7 +732,7 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
-            
+
             <div className="bg-white rounded-lg shadow-sm border p-6">
               <div className="flex items-center">
                 <div className="bg-yellow-100 p-3 rounded-full">
@@ -737,7 +744,7 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
-            
+
             <div className="bg-white rounded-lg shadow-sm border p-6">
               <div className="flex items-center">
                 <div className="bg-green-100 p-3 rounded-full">
@@ -749,7 +756,7 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
-            
+
             <div className="bg-white rounded-lg shadow-sm border p-6">
               <div className="flex items-center">
                 <div className="bg-red-100 p-3 rounded-full">
@@ -771,9 +778,8 @@ export default function DashboardPage() {
               <div className="flex items-center gap-3">
                 <h2 className="text-xl font-semibold text-gray-900">Profile Information</h2>
                 <span
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
-                    profileCompletion.percent === 100 ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'
-                  }`}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${profileCompletion.percent === 100 ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'
+                    }`}
                 >
                   {profileCompletion.percent === 100 && <CheckCircle className="h-3 w-3" />}
                   {profileCompletion.percent}% complete
@@ -872,14 +878,14 @@ export default function DashboardPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Website
                 </label>
-                  <input
-                    type="text"
-                    name="website"
-                    value={profileForm.website}
-                    onChange={handleInputChange}
-                    placeholder="your-website.com or https://your-website.com"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                <input
+                  type="text"
+                  name="website"
+                  value={profileForm.website}
+                  onChange={handleInputChange}
+                  placeholder="your-website.com or https://your-website.com"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
 
               {/* Participant-specific fields */}
@@ -887,7 +893,7 @@ export default function DashboardPage() {
                 <>
                   <div className="border-t pt-6 mt-6">
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">Additional Information</h3>
-                    
+
                     {/* Email */}
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1085,7 +1091,7 @@ export default function DashboardPage() {
                         />
                         <span className="text-sm font-medium text-gray-700">Participant with fewer opportunities</span>
                       </label>
-                      
+
                       {profileForm.has_fewer_opportunities && (
                         <div className="ml-8 mt-3 p-4 bg-gray-50 rounded-lg">
                           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1134,11 +1140,10 @@ export default function DashboardPage() {
               )}
 
               {profileUpdateMessage && (
-                <div className={`p-3 rounded-md ${
-                  profileUpdateMessage.includes('successfully') 
-                    ? 'bg-green-50 text-green-700 border border-green-200' 
+                <div className={`p-3 rounded-md ${profileUpdateMessage.includes('successfully')
+                    ? 'bg-green-50 text-green-700 border border-green-200'
                     : 'bg-red-50 text-red-700 border border-red-200'
-                }`}>
+                  }`}>
                   {profileUpdateMessage}
                 </div>
               )}
@@ -1258,14 +1263,13 @@ export default function DashboardPage() {
                             {application.status === 'accepted' && <CheckCircle className="h-4 w-4 text-green-600" />}
                             {application.status === 'rejected' && <XCircle className="h-4 w-4 text-red-600" />}
                             {application.status === 'pending' && <Clock className="h-4 w-4 text-yellow-600" />}
-                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                              application.status === 'accepted' ? 'bg-green-100 text-green-800' :
-                              application.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                              'bg-yellow-100 text-yellow-800'
-                            }`}>
-                              {application.status === 'pending' ? 'Under Review' : 
-                               application.status === 'accepted' ? 'Accepted!' : 
-                               'Not Selected'}
+                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${application.status === 'accepted' ? 'bg-green-100 text-green-800' :
+                                application.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                  'bg-yellow-100 text-yellow-800'
+                              }`}>
+                              {application.status === 'pending' ? 'Under Review' :
+                                application.status === 'accepted' ? 'Accepted!' :
+                                  'Not Selected'}
                             </span>
                           </div>
                         </div>
@@ -1308,7 +1312,7 @@ export default function DashboardPage() {
                       <p className="text-xs text-gray-500">Participant</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center">
                     <Calendar className="h-5 w-5 text-gray-400 mr-3" />
                     <div>
@@ -1318,7 +1322,7 @@ export default function DashboardPage() {
                       <p className="text-xs text-gray-500">Age</p>
                     </div>
                   </div>
-                  
+
                   {profile.location && (
                     <div className="flex items-center">
                       <Award className="h-5 w-5 text-gray-400 mr-3" />
@@ -1328,7 +1332,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                   )}
-                  
+
                   {profile.bio && (
                     <div className="pt-3 border-t">
                       <p className="text-xs text-gray-500 mb-1">Bio</p>
@@ -1354,7 +1358,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="bg-white rounded-lg shadow-sm border p-6">
                 <div className="flex items-center">
                   <div className="bg-green-100 p-3 rounded-full">
@@ -1366,7 +1370,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="bg-white rounded-lg shadow-sm border p-6">
                 <div className="flex items-center">
                   <div className="bg-purple-100 p-3 rounded-full">
@@ -1378,7 +1382,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="bg-white rounded-lg shadow-sm border p-6">
                 <div className="flex items-center">
                   <div className="bg-orange-100 p-3 rounded-full">
@@ -1419,8 +1423,8 @@ export default function DashboardPage() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
                 <div className="text-center py-8">
                   <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500 text-sm">No recent activity</p>
-                    <p className="text-gray-400 text-xs mt-2">Create your first event to get started!</p>
+                  <p className="text-gray-500 text-sm">No recent activity</p>
+                  <p className="text-gray-400 text-xs mt-2">Create your first event to get started!</p>
                 </div>
               </div>
 
@@ -1435,7 +1439,7 @@ export default function DashboardPage() {
                       <p className="text-xs text-gray-500">Verified Organization</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center">
                     <User className="h-5 w-5 text-gray-400 mr-3" />
                     <div>
@@ -1443,7 +1447,7 @@ export default function DashboardPage() {
                       <p className="text-xs text-gray-500">Contact Email</p>
                     </div>
                   </div>
-                  
+
                   {profile.location && (
                     <div className="flex items-center">
                       <Award className="h-5 w-5 text-gray-400 mr-3" />
@@ -1453,14 +1457,14 @@ export default function DashboardPage() {
                       </div>
                     </div>
                   )}
-                  
+
                   {profile.bio && (
                     <div className="pt-3 border-t">
                       <p className="text-xs text-gray-500 mb-1">About</p>
                       <p className="text-sm text-gray-700 line-clamp-3">{profile.bio}</p>
                     </div>
                   )}
-                  
+
                   <Link
                     href="/profile"
                     className="mt-4 w-full flex items-center justify-center px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"

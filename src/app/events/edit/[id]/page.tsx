@@ -387,14 +387,6 @@ export default function EditEventPage() {
         return
       }
 
-      // Session is already available from getSession()
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-      if (sessionError || !session) {
-        setFormError('Session expired. Please log in again.')
-        setSaving(false)
-        return
-      }
-
       const photoUrl = await uploadImageIfNeeded()
 
       // Ensure event_type is valid
@@ -440,7 +432,7 @@ export default function EditEventPage() {
           const fullDesc = formData.full_description.trim()
           const shortDesc = formData.short_description.trim()
           const titleDesc = formData.title.trim()
-          
+
           if (fullDesc && fullDesc.length > 0) {
             return fullDesc
           }
@@ -485,10 +477,10 @@ export default function EditEventPage() {
 
       // Update the event (RLS policies will ensure user owns it)
       console.log('Attempting to update event with payload:', JSON.stringify(eventPayload, null, 2))
-      
+
       // Ensure organization_id is set in the payload (in case it wasn't set before)
       eventPayload.organization_id = currentUser.id
-      
+
       const { data, error: updateError } = await supabase
         .from('events')
         .update(eventPayload)
@@ -501,7 +493,7 @@ export default function EditEventPage() {
         console.error('Error message:', updateError.message)
         console.error('Error details:', updateError.details)
         console.error('Error hint:', updateError.hint)
-        
+
         // Provide user-friendly error messages
         let errorMsg = 'Failed to update event.'
         if (updateError.code === '23514') {

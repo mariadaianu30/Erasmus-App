@@ -43,23 +43,27 @@ export default function CreateProjectPage() {
       }
 
       setUser(currentUser)
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('user_type, organization_name, email')
-      .eq('id', currentUser.id)
-      .single()
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('user_type, organization_name, email')
+        .eq('id', currentUser.id)
+        .single()
 
-    if (!profileData || profileData.user_type !== 'organization') {
-      router.push('/projects')
-      return
-    }
+      if (!profileData || profileData.user_type !== 'organization') {
+        router.push('/projects')
+        return
+      }
 
-    setProfile(profileData)
-    // Set default project_email to organization's email
-    if (profileData.email) {
-      setFormData(prev => ({ ...prev, project_email: profileData.email }))
+      setProfile(profileData)
+      // Set default project_email to organization's email
+      if (profileData.email) {
+        setFormData(prev => ({ ...prev, project_email: profileData.email }))
+      }
+      setLoading(false)
+    } catch (error) {
+      console.error('Auth check error:', error)
+      router.push('/auth')
     }
-    setLoading(false)
   }, [router])
 
   useEffect(() => {

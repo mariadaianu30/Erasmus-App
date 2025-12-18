@@ -53,15 +53,15 @@ export default function EventsPage() {
 
       // Fetch organization names for all unique organization IDs
       const organizationIds = [...new Set((data || []).map((event: any) => event.organization_id).filter(Boolean))]
-      
+
       const organizationMap: Record<string, { name: string | null; website: string | null }> = {}
-      
+
       if (organizationIds.length > 0) {
         const { data: profiles } = await supabase
           .from('profiles')
           .select('id, organization_name, website')
           .in('id', organizationIds)
-        
+
         if (profiles) {
           profiles.forEach((profile: any) => {
             organizationMap[profile.id] = {
@@ -80,7 +80,7 @@ export default function EventsPage() {
       }))
 
       setEvents(eventsWithOrgName)
-      
+
       // Extract unique categories
       const uniqueCategories = [...new Set(eventsWithOrgName.map((event: Event) => event.category) || [])]
       setCategories(uniqueCategories)
@@ -95,17 +95,17 @@ export default function EventsPage() {
 
   const filteredEvents = events.filter(event => {
     const query = searchTerm.toLowerCase()
-    const matchesSearch = !query || 
+    const matchesSearch = !query ||
       event.title.toLowerCase().includes(query) ||
       event.description.toLowerCase().includes(query) ||
       event.location.toLowerCase().includes(query) ||
       event.organization_name?.toLowerCase().includes(query)
-    
+
     const matchesCategory = !selectedCategory || event.category === selectedCategory
-    
-    const matchesLocation = !locationFilter || 
+
+    const matchesLocation = !locationFilter ||
       event.location.toLowerCase().includes(locationFilter.toLowerCase())
-    
+
     return matchesSearch && matchesCategory && matchesLocation
   })
 
@@ -142,7 +142,7 @@ export default function EventsPage() {
             <div className="h-9 bg-gray-200 rounded w-64 mx-auto mb-4 animate-pulse"></div>
             <div className="h-5 bg-gray-200 rounded w-96 mx-auto mb-8 animate-pulse"></div>
           </div>
-          
+
           {/* Search Skeleton */}
           <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
             <div className="h-10 bg-gray-200 rounded animate-pulse"></div>
@@ -198,11 +198,10 @@ export default function EventsPage() {
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowFilters(!showFilters)}
-                  className={`flex items-center gap-2 px-4 py-3 border rounded-lg transition-all duration-200 ${
-                    showFilters || hasActiveFilters
+                  className={`flex items-center gap-2 px-4 py-3 border rounded-lg transition-all duration-200 ${showFilters || hasActiveFilters
                       ? 'bg-blue-50 border-blue-300 text-blue-700 shadow-sm'
                       : 'border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
-                  }`}
+                    }`}
                   aria-label="Toggle filters"
                 >
                   <SlidersHorizontal className="h-5 w-5" />
@@ -307,7 +306,7 @@ export default function EventsPage() {
             <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No opportunities found</h3>
             <p className="text-gray-500">
-              {searchTerm || selectedCategory 
+              {searchTerm || selectedCategory
                 ? 'Try adjusting your search criteria'
                 : 'No opportunities are currently available. Check back soon!'
               }
@@ -315,7 +314,7 @@ export default function EventsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredEvents.map((event) => (
+            {filteredEvents.map((event, index) => (
               <div key={event.id} className="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow overflow-hidden flex flex-col">
                 {event.photo_url ? (
                   <div className="relative h-48 w-full">
@@ -325,6 +324,7 @@ export default function EventsPage() {
                       fill
                       className="object-cover"
                       unoptimized
+                      priority={index === 0}
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none'
                       }}
@@ -343,9 +343,9 @@ export default function EventsPage() {
                       {event.category}
                     </span>
                   </div>
-                  
+
                   <p className="text-gray-600 text-sm mb-4 line-clamp-3">{event.description}</p>
-                  
+
                   <div className="space-y-2 mb-4">
                     <div className="flex items-center text-sm text-gray-500">
                       <Calendar className="h-4 w-4 mr-2" />
@@ -364,13 +364,13 @@ export default function EventsPage() {
                       Up to {event.max_participants} participants
                     </div>
                   </div>
-                  
+
                   {event.organization_name && (
                     <div className="text-sm text-gray-600 mb-4">
                       by <span className="font-medium">{event.organization_name}</span>
                     </div>
                   )}
-                  
+
                   <Link
                     href={`/events/${event.id}`}
                     className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors text-center block mt-auto focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
