@@ -29,7 +29,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full scroll-smooth">
+    <html lang="en" className="h-full scroll-smooth" suppressHydrationWarning>
       <body className={`${interTight.variable} font-sans h-full antialiased`} suppressHydrationWarning>
         <div className="min-h-full flex flex-col">
           <Navbar />

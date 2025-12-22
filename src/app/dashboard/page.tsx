@@ -139,6 +139,14 @@ export default function DashboardPage() {
 
         setUser(session.user)
 
+        // Kick off application fetch immediately if it likely looks like a participant
+        // Or just fetch it optimistically; if not needed (org), we ignore it or it's just extra network call.
+        // Checking metadata is faster than waiting for profile fetch.
+        const userType = session.user.user_metadata?.user_type || 'participant'
+        if (userType === 'participant') {
+          fetchApplications(session.user.id) // Don't await, let it run in parallel
+        }
+
         // Fetch user profile with all fields
         let { data: profileData, error: profileError } = await supabase
           .from('profiles')
@@ -277,10 +285,7 @@ export default function DashboardPage() {
             participant_target_groups: targetGroups
           })
 
-          // Fetch applications for participants
-          if (profileData.user_type === 'participant') {
-            await fetchApplications(session.user.id)
-          }
+
         }
       } catch (error) {
         console.error('Dashboard error:', error)
@@ -1141,8 +1146,8 @@ export default function DashboardPage() {
 
               {profileUpdateMessage && (
                 <div className={`p-3 rounded-md ${profileUpdateMessage.includes('successfully')
-                    ? 'bg-green-50 text-green-700 border border-green-200'
-                    : 'bg-red-50 text-red-700 border border-red-200'
+                  ? 'bg-green-50 text-green-700 border border-green-200'
+                  : 'bg-red-50 text-red-700 border border-red-200'
                   }`}>
                   {profileUpdateMessage}
                 </div>
@@ -1264,8 +1269,8 @@ export default function DashboardPage() {
                             {application.status === 'rejected' && <XCircle className="h-4 w-4 text-red-600" />}
                             {application.status === 'pending' && <Clock className="h-4 w-4 text-yellow-600" />}
                             <span className={`text-xs px-2 py-1 rounded-full font-medium ${application.status === 'accepted' ? 'bg-green-100 text-green-800' :
-                                application.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                                  'bg-yellow-100 text-yellow-800'
+                              application.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                'bg-yellow-100 text-yellow-800'
                               }`}>
                               {application.status === 'pending' ? 'Under Review' :
                                 application.status === 'accepted' ? 'Accepted!' :
