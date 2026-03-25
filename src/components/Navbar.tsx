@@ -33,6 +33,7 @@ export default function Navbar() {
   const [signingOut, setSigningOut] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
+  const isEventsPage = pathname?.startsWith('/events')
 
   const fetchProfile = useCallback(async (userId: string, retryCount = 0) => {
     try {
@@ -45,25 +46,25 @@ export default function Navbar() {
       // Handle case where profile doesn't exist yet (common during sign-up)
       if (error) {
         // Check if it's a "not found" error or empty error object
-        const isNotFoundError = error.code === 'PGRST116' || 
-                                error.message?.includes('No rows found') ||
-                                error.message?.includes('not found') ||
-                                Object.keys(error).length === 0 ||
-                                !error.code // Handle cases where error object has no code
-        
+        const isNotFoundError = error.code === 'PGRST116' ||
+          error.message?.includes('No rows found') ||
+          error.message?.includes('not found') ||
+          Object.keys(error).length === 0 ||
+          !error.code // Handle cases where error object has no code
+
         if (isNotFoundError) {
           // Retry up to 3 times with delay for new sign-ups
           if (retryCount < 3) {
             setTimeout(() => fetchProfile(userId, retryCount + 1), (retryCount + 1) * 2000)
             return
           }
-          
+
           // Try to create a basic profile if it doesn't exist
           try {
             // Get user metadata to extract names - use session instead of getUser()
             const { data: { session } } = await supabase.auth.getSession()
             const userMeta = session?.user?.user_metadata || {}
-            
+
             // Try to insert, but if it fails due to existing profile, update instead
             const { error: insertError } = await supabase
               .from('profiles')
@@ -75,7 +76,7 @@ export default function Navbar() {
                 birth_date: userMeta.birth_date || new Date(Date.now() - 18 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
                 organization_name: userMeta.organization_name || null
               })
-            
+
             if (insertError) {
               console.error('Failed to create/update profile:', insertError)
               setProfile(null)
@@ -89,7 +90,7 @@ export default function Navbar() {
           }
           return
         }
-        
+
         // Only log meaningful errors (skip empty error objects)
         if (Object.keys(error).length > 0 && error.code && error.code !== 'PGRST116') {
           console.error('Profile fetch error:', error.code, error.message)
@@ -168,61 +169,61 @@ export default function Navbar() {
       if (user?.email) {
         const emailName = user.email.split('@')[0]
         // Capitalize first letter and replace dots/underscores with spaces
-        return emailName.replace(/[._]/g, ' ').split(' ').map(word => 
+        return emailName.replace(/[._]/g, ' ').split(' ').map(word =>
           word.charAt(0).toUpperCase() + word.slice(1)
         ).join(' ')
       }
       return 'User'
     }
-    
+
     if (profile.user_type === 'organization') {
       return profile.organization_name || 'Organization'
     }
-    
+
     // For participants, try to get a meaningful display name
     const firstName = profile.first_name?.trim() || ''
     const lastName = profile.last_name?.trim() || ''
-    
+
     // Check if names are empty or default values
-    const isEmptyName = (!firstName || firstName.trim() === '' || firstName === 'User') && 
-                       (!lastName || lastName.trim() === '' || lastName === 'User')
-    
+    const isEmptyName = (!firstName || firstName.trim() === '' || firstName === 'User') &&
+      (!lastName || lastName.trim() === '' || lastName === 'User')
+
     if (isEmptyName) {
       // If names are empty, extract from email
       if (user?.email) {
         const emailName = user.email.split('@')[0]
         // Capitalize first letter and replace dots/underscores with spaces
-        return emailName.replace(/[._]/g, ' ').split(' ').map(word => 
+        return emailName.replace(/[._]/g, ' ').split(' ').map(word =>
           word.charAt(0).toUpperCase() + word.slice(1)
         ).join(' ')
       }
       return 'User'
     }
-    
+
     // If we have both names, show full name
     if (firstName && lastName) {
       return `${firstName} ${lastName}`
     }
-    
+
     // If we have only first name, show it
     if (firstName) {
       return firstName
     }
-    
+
     // If we have only last name, show it
     if (lastName) {
       return lastName
     }
-    
+
     // Extract name from email if possible (before @)
     if (user?.email) {
       const emailName = user.email.split('@')[0]
       // Capitalize first letter and replace dots/underscores with spaces
-      return emailName.replace(/[._]/g, ' ').split(' ').map(word => 
+      return emailName.replace(/[._]/g, ' ').split(' ').map(word =>
         word.charAt(0).toUpperCase() + word.slice(1)
       ).join(' ')
     }
-    
+
     // Final fallback
     return 'User'
   }
@@ -266,6 +267,14 @@ export default function Navbar() {
 
   const getDesktopNavClasses = (href: string) => {
     const active = isRouteActive(href)
+    if (isEventsPage) {
+      return [
+        'px-3 py-2 rounded-md text-sm font-medium transition-colors border',
+        active
+          ? 'bg-blue-800 text-white border-blue-700 shadow-sm'
+          : 'text-blue-100 hover:text-white border-transparent',
+      ].join(' ')
+    }
     return [
       'px-3 py-2 rounded-md text-sm font-medium transition-colors border',
       active
@@ -289,10 +298,10 @@ export default function Navbar() {
       {/* Logo */}
       <div className="flex items-center">
         <Link href="/" className="flex items-center group">
-          <Calendar className="h-8 w-8 text-blue-600 group-hover:text-blue-700 transition-colors duration-200" />
+          <Calendar className={`h-8 w-8 transition-colors duration-200 ${isEventsPage ? 'text-white group-hover:text-blue-100' : 'text-blue-600 group-hover:text-blue-700'}`} />
           <div className="ml-2">
-            <div className="text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors duration-200">Erasmus+ Connect</div>
-            <div className="text-xs text-gray-500 -mt-1">by Scout Society</div>
+            <div className={`text-xl font-bold transition-colors duration-200 ${isEventsPage ? 'text-white group-hover:text-blue-100' : 'text-gray-900 group-hover:text-blue-600'}`}>Erasmus+ Connect</div>
+            <div className={`text-xs -mt-1 ${isEventsPage ? 'text-blue-200' : 'text-gray-500'}`}>by Scout Society</div>
           </div>
         </Link>
       </div>
@@ -316,7 +325,7 @@ export default function Navbar() {
           <div className="flex items-center space-x-4">
             <Link
               href="/profile"
-              className="flex items-center text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+              className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${isEventsPage ? 'text-white hover:text-blue-200' : 'text-gray-700 hover:text-blue-600'}`}
             >
               <User className="h-4 w-4 mr-2" />
               {getDisplayName()}
@@ -343,7 +352,7 @@ export default function Navbar() {
           <div className="flex items-center space-x-4">
             <Link
               href="/auth"
-              className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isEventsPage ? 'bg-white text-blue-900 hover:bg-gray-100' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
             >
               Login/Register
             </Link>
@@ -355,7 +364,7 @@ export default function Navbar() {
       <div className="md:hidden flex items-center">
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="text-gray-700 hover:text-blue-600 p-2 rounded-md"
+          className={`p-2 rounded-md transition-colors ${isEventsPage ? 'text-white hover:text-blue-200' : 'text-gray-700 hover:text-blue-600'}`}
         >
           {mobileMenuOpen ? (
             <X className="h-6 w-6" />
@@ -369,7 +378,7 @@ export default function Navbar() {
 
   if (loading) {
     return (
-      <nav className="bg-white shadow-md border-b border-gray-200 sticky top-0 z-50">
+      <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-5xl bg-white/90 backdrop-blur-md shadow-2xl rounded-full border border-gray-200/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
@@ -391,7 +400,7 @@ export default function Navbar() {
   }
 
   return (
-    <nav className="bg-white shadow-sm border-b sticky top-0 z-50">
+    <nav className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-5xl backdrop-blur-md shadow-2xl rounded-full border transition-colors duration-300 ${isEventsPage ? 'bg-blue-900/95 border-blue-700/50' : 'bg-white/90 border-gray-200/50'}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {navContent}
@@ -399,11 +408,11 @@ export default function Navbar() {
 
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
-          <div 
+          <div
             className="md:hidden fixed inset-0 z-40 bg-black bg-opacity-50 transition-opacity duration-300"
             onClick={() => setMobileMenuOpen(false)}
           >
-            <div 
+            <div
               className="bg-white w-64 sm:w-80 h-full shadow-xl transform transition-transform duration-300 ease-out"
               onClick={(e) => e.stopPropagation()}
             >
@@ -428,7 +437,7 @@ export default function Navbar() {
                     {item.name}
                   </Link>
                 ))}
-                
+
                 {!user && (
                   <div className="border-t border-gray-200 pt-4 mt-4">
                     <Link
@@ -440,7 +449,7 @@ export default function Navbar() {
                     </Link>
                   </div>
                 )}
-                
+
                 {user && (
                   <div className="border-t border-gray-200 pt-4 mt-4 space-y-2">
                     <Link

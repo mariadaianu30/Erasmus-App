@@ -1,13 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Inter_Tight } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
-const interTight = Inter_Tight({
+const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-inter-tight",
-  weight: ["300", "400", "500", "600", "700", "800", "900"],
+  variable: "--font-inter",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -20,7 +20,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
-  themeColor: "#3b82f6",
+  themeColor: "#FFFFFF",
 };
 
 export default function RootLayout({
@@ -29,11 +29,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full scroll-smooth" suppressHydrationWarning>
-      <body className={`${interTight.variable} font-sans h-full antialiased`} suppressHydrationWarning>
-        <div className="min-h-full flex flex-col">
+    <html lang="en" className="scroll-smooth" suppressHydrationWarning>
+      <body className={`${inter.variable} font-sans min-h-screen antialiased bg-background text-foreground`} suppressHydrationWarning>
+        <div className="flex flex-col min-h-screen">
           <Navbar />
-          <main className="flex-1 page-transition">
+          <main className="flex-1 page-transition relative overflow-hidden">
             {children}
           </main>
           <Footer />

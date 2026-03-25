@@ -1,918 +1,828 @@
-'use client'
+"use client";
 
-import { useState, useEffect, useRef } from 'react'
-import Link from 'next/link'
-import { motion, useScroll, useTransform, useInView, useMotionValue, useSpring } from 'framer-motion'
-import { Calendar, Users, ArrowRight, Star, CheckCircle, Award } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
-
-interface Stats {
-  totalEvents: number
-  totalOrganizations: number
-  totalParticipants: number
-  totalApplications: number
-  acceptedApplications: number
-  pendingApplications: number
-  upcomingEvents: number
-}
-
-interface Creator {
-  name: string
-  role: string
-  description: string
-  gradient: string
-}
-
-// Gallery images
-const galleryImages = [
-  'https://i.pinimg.com/736x/1d/67/ad/1d67adb1c2fb06236272c9125f6930d1.jpg',
-  'https://i.pinimg.com/1200x/d3/fa/f0/d3faf0ed7989863d5499f5041e46c513.jpg',
-  'https://i.pinimg.com/736x/6a/a9/5a/6aa95af5f4c6b4d1d35b00c17aab65ca.jpg',
-  'https://i.pinimg.com/736x/5f/9c/16/5f9c16117b2b1d3fb3f1f7095d5f747e.jpg',
-  'https://i.pinimg.com/1200x/24/8c/7b/248c7b9c002815db9beec55c90ebbd9a.jpg',
-  'https://i.pinimg.com/736x/14/26/b4/1426b44f0ba38405663b5da798584d16.jpg',
-  'https://i.pinimg.com/1200x/20/79/00/2079008cf7bc8c9c4d114b19ba2e3c07.jpg',
-  'https://i.pinimg.com/1200x/e6/2c/c5/e62cc509cd98aea2fb04d33547ede827.jpg',
-  'https://i.pinimg.com/1200x/1a/4f/b3/1a4fb3695d6864effd380a65f9d4ce6f.jpg',
-  'https://i.pinimg.com/736x/af/34/7f/af347fe88222bccfafb99c6cfd97cf76.jpg',
-]
-
-// Typewriter component
-const Typewriter = ({ text, delay = 100 }: { text: string; delay?: number }) => {
-  const [displayedText, setDisplayedText] = useState('')
-  const [currentIndex, setCurrentIndex] = useState(0)
-
-  useEffect(() => {
-    if (currentIndex < text.length) {
-      const timeout = setTimeout(() => {
-        setDisplayedText(prev => prev + text[currentIndex])
-        setCurrentIndex(prev => prev + 1)
-      }, delay)
-      return () => clearTimeout(timeout)
-    }
-  }, [currentIndex, text, delay])
-
-  return <span>{displayedText}</span>
-}
-
-// Transparent Title Section
-const TransparentTitleSection = () => {
-  const introRef = useRef<HTMLDivElement>(null)
-  const introInView = useInView(introRef, { once: true, amount: 0.3 })
-
-  return (
-    <motion.section
-      ref={introRef}
-      className="relative h-screen flex items-center justify-center overflow-hidden bg-elegant-navy-dark"
-      initial={{ opacity: 0 }}
-      animate={introInView ? { opacity: 1 } : {}}
-      transition={{ duration: 1.2 }}
-    >
-      {/* Background Image */}
-      <div 
-        className="absolute inset-0"
-        style={{
-          backgroundImage: 'url(https://i.pinimg.com/1200x/e0/b3/93/e0b39350a86b7195925e6e4dc7446758.jpg)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-        }}
-      />
-      
-      {/* Overlay gradient */}
-      <div className="absolute inset-0 bg-gradient-to-b from-elegant-navy-dark/80 via-elegant-navy-dark/60 to-elegant-navy-dark/80" />
-      
-      <motion.div
-        className="relative z-10 text-center"
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={introInView ? { scale: 1, opacity: 1 } : {}}
-        transition={{ duration: 1.5, ease: 'easeOut' }}
-      >
-        <h1
-          className="text-7xl md:text-[10rem] lg:text-[14rem] font-black leading-[0.9] tracking-tight"
-          style={{
-            backgroundImage: 'linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.6) 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-            textShadow: '0 0 80px rgba(255, 255, 255, 0.3)',
-            fontFamily: 'var(--font-inter-tight), system-ui, sans-serif',
-            letterSpacing: '-0.03em',
-          }}
-        >
-          ERASMUS+
-        </h1>
-        <motion.h2
-          className="text-5xl md:text-[7rem] lg:text-[10rem] font-black leading-[0.9] tracking-tight mt-2"
-          style={{
-            backgroundImage: 'linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.6) 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-            textShadow: '0 0 80px rgba(255, 255, 255, 0.3)',
-            fontFamily: 'var(--font-inter-tight), system-ui, sans-serif',
-            letterSpacing: '-0.03em',
-          }}
-          initial={{ opacity: 0, y: 30 }}
-          animate={introInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ delay: 0.5, duration: 1 }}
-        >
-          CONNECT
-        </motion.h2>
-      </motion.div>
-    </motion.section>
-  )
-}
-
-// Figma-Style Draggable Gallery
-const DraggableGallery = () => {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const x = useMotionValue(0)
-  const mouseX = useMotionValue(0)
-  const mouseY = useMotionValue(0)
-  
-  // Calculate constraints based on container width
-  const [constraints, setConstraints] = useState({ left: 0, right: 0 })
-  
-  useEffect(() => {
-    const updateConstraints = () => {
-      if (containerRef.current) {
-        const containerWidth = containerRef.current.offsetWidth
-        const imageWidth = 400 // Each image is 400px wide
-        const gap = 24 // Gap between images
-        const totalWidth = galleryImages.length * (imageWidth + gap) - gap
-        const maxDrag = containerWidth - totalWidth
-        
-        setConstraints({
-          left: Math.min(0, maxDrag),
-          right: 0,
-        })
-      }
-    }
-    
-    updateConstraints()
-    window.addEventListener('resize', updateConstraints)
-    return () => window.removeEventListener('resize', updateConstraints)
-  }, [])
-
-  // Mouse parallax effect
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect()
-        const centerX = rect.left + rect.width / 2
-        const centerY = rect.top + rect.height / 2
-        mouseX.set((e.clientX - centerX) / rect.width)
-        mouseY.set((e.clientY - centerY) / rect.height)
-      }
-    }
-
-    window.addEventListener('mousemove', handleMouseMove)
-    return () => window.removeEventListener('mousemove', handleMouseMove)
-  }, [mouseX, mouseY])
-
-  const parallaxX = useSpring(useTransform(mouseX, [-0.5, 0.5], [-5, 5]), { stiffness: 50, damping: 20 })
-  const parallaxY = useSpring(useTransform(mouseY, [-0.5, 0.5], [-5, 5]), { stiffness: 50, damping: 20 })
-
-  return (
-    <div ref={containerRef} className="absolute inset-0 overflow-hidden z-0">
-      {/* Subtle overlay */}
-      <div className="absolute inset-0 bg-gradient-to-b from-elegant-navy-dark/20 via-transparent to-elegant-navy-dark/20 z-10 pointer-events-none" />
-      
-      <motion.div
-        className="flex gap-6 h-full items-center z-0"
-        style={{ x }}
-        drag="x"
-        dragConstraints={constraints}
-        dragElastic={0.1}
-        dragMomentum={true}
-        dragTransition={{ bounceStiffness: 300, bounceDamping: 30 }}
-        whileDrag={{ cursor: 'grabbing' }}
-      >
-        {galleryImages.map((image, index) => (
-          <motion.div
-            key={`${image}-${index}`}
-            className="flex-shrink-0 w-[400px] h-[600px] rounded-2xl overflow-hidden shadow-2xl relative"
-            style={{
-              x: parallaxX,
-              y: parallaxY,
-            }}
-            whileHover={{ scale: 1.02, zIndex: 20 }}
-            transition={{ duration: 0.3 }}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={image}
-              alt={`Gallery image ${index + 1}`}
-              className="w-full h-full object-cover"
-              loading="eager"
-              draggable={false}
-            />
-            {/* Subtle shadow overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
-          </motion.div>
-        ))}
-      </motion.div>
-    </div>
-  )
-}
+import { motion } from "framer-motion";
+import { useRef, useState, useEffect } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { ArrowRight } from "lucide-react";
+import GlobalBlueLine from "@/components/GlobalBlueLine";
+import ScatteredSection from "@/components/ScatteredSection";
+import IntroSplash from "@/components/IntroSplash";
+import { supabase } from "@/lib/supabase";
 
 export default function Home() {
-  const [stats, setStats] = useState<Stats>({ 
-    totalEvents: 0, 
-    totalOrganizations: 0, 
-    totalParticipants: 0, 
-    totalApplications: 0,
-    acceptedApplications: 0,
-    pendingApplications: 0,
-    upcomingEvents: 0
-  })
-  const [loading, setLoading] = useState(true)
-  
-  const heroRef = useRef<HTMLDivElement>(null)
-  const impactRef = useRef<HTMLDivElement>(null)
-  const whyChooseRef = useRef<HTMLDivElement>(null)
-  const creatorRef = useRef<HTMLDivElement>(null)
-  
-  const { scrollYProgress } = useScroll()
-  const heroScale = useTransform(scrollYProgress, [0, 0.3], [1, 0.98])
-  
-  const heroInView = useInView(heroRef, { once: true, amount: 0.3 })
-  const impactInView = useInView(impactRef, { once: true, amount: 0.2 })
-  const whyChooseInView = useInView(whyChooseRef, { once: true, amount: 0.2 })
-  const creatorInView = useInView(creatorRef, { once: true, amount: 0.2 })
+  const whyChooseRef = useRef(null);
+  const [whyChooseInView, setWhyChooseInView] = useState(false);
+  const [opportunities, setOpportunities] = useState<any[]>([]);
+  const [loadingOps, setLoadingOps] = useState(true);
+  const [organizationsList, setOrganizationsList] = useState<any[]>([]);
+  const [loadingOrgs, setLoadingOrgs] = useState(true);
+  const [trustStats, setTrustStats] = useState({
+    verifiedOrgs: 0,
+    youthHelped: 0,
+    countries: 0
+  });
+  const [activeTab, setActiveTab] = useState<'young-people' | 'organizations'>('young-people');
+
+  // Helper for slug (same as in organizations/page.tsx)
+  const slugifyOrganizationName = (name: string) =>
+    name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchStats()
-    }, 100)
-    
-    return () => clearTimeout(timer)
-  }, [])
+    const fetchOpportunities = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('events')
+          .select('*')
+          .eq('is_published', true)
+          // Order by creation or start date
+          .order('created_at', { ascending: false })
+          .limit(3);
 
-  const fetchStats = async () => {
-    try {
-      const [
-        eventsResult, 
-        orgsResult, 
-        participantsResult, 
-        applicationsResult,
-        acceptedAppsResult,
-        pendingAppsResult,
-        upcomingEventsResult
-      ] = await Promise.all([
-        supabase.from('events').select('id', { count: 'exact' }).eq('is_published', true),
-        supabase.from('profiles').select('id', { count: 'exact' }).eq('user_type', 'organization'),
-        supabase.from('profiles').select('id', { count: 'exact' }).eq('user_type', 'participant'),
-        supabase.from('applications').select('id', { count: 'exact' }),
-        supabase.from('applications').select('id', { count: 'exact' }).eq('status', 'accepted'),
-        supabase.from('applications').select('id', { count: 'exact' }).eq('status', 'pending'),
-        supabase.from('events').select('id', { count: 'exact' }).eq('is_published', true).gte('start_date', new Date().toISOString())
-      ])
+        if (data) {
+          setOpportunities(data);
+        }
+      } catch (e) {
+        console.error("Error fetching opportunities", e);
+      } finally {
+        setLoadingOps(false);
+      }
+    };
 
-      setStats({
-        totalEvents: eventsResult.count || 0,
-        totalOrganizations: orgsResult.count || 0,
-        totalParticipants: participantsResult.count || 0,
-        totalApplications: applicationsResult.count || 0,
-        acceptedApplications: acceptedAppsResult.count || 0,
-        pendingApplications: pendingAppsResult.count || 0,
-        upcomingEvents: upcomingEventsResult.count || 0
-      })
-    } catch {
-      setStats({
-        totalEvents: 0,
-        totalOrganizations: 0,
-        totalParticipants: 0,
-        totalApplications: 0,
-        acceptedApplications: 0,
-        pendingApplications: 0,
-        upcomingEvents: 0
-      })
-    } finally {
-      setLoading(false)
+    const fetchOrganizations = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('organization_view')
+          .select('*')
+          .eq('is_verified', true) // Only fetch verified organizations
+          .limit(2);
+
+        if (data) {
+          setOrganizationsList(data);
+        }
+      } catch (e) {
+        console.error("Error fetching organizations", e);
+      } finally {
+        setLoadingOrgs(false);
+      }
+    };
+
+    const fetchTrustStats = async () => {
+      try {
+        // Verified Organizations
+        const { count: orgsCount } = await supabase
+          .from('organization_view')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_verified', true);
+
+        // Youth Helped (Accepted Applications)
+        const { count: youthCount } = await supabase
+          .from('applications')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'accepted');
+
+        // Countries Covered (Unique countries in events)
+        const { data: eventsData } = await supabase
+          .from('events')
+          .select('country')
+          .eq('is_published', true);
+
+        const uniqueCountries = new Set(eventsData?.map(e => e.country).filter(Boolean)).size;
+
+        setTrustStats({
+          verifiedOrgs: orgsCount || 0,
+          youthHelped: youthCount || 0,
+          countries: uniqueCountries || 0
+        });
+      } catch (e) {
+        console.error("Error fetching trust stats", e);
+      }
+    };
+
+    fetchOpportunities();
+    fetchOrganizations();
+    fetchTrustStats();
+  }, []);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setWhyChooseInView(true);
+        }
+      },
+      { threshold: 0.1 }
+    );
+    if (whyChooseRef.current) {
+      observer.observe(whyChooseRef.current);
     }
-  }
+    return () => observer.disconnect();
+  }, []);
 
-  // Creator data
-  const creators: Creator[] = [
-    {
-      name: 'Scout Society',
-      role: 'Platform Architects',
-      description: 'Leading the development of Erasmus+ Connect with a vision to bridge communities across Europe.',
-      gradient: 'from-elegant-green-dark to-elegant-green-medium',
-    },
-    {
-      name: 'Design Collective',
-      role: 'Visual Storytellers',
-      description: 'Creating the cinematic, editorial aesthetic that makes Erasmus+ Connect feel both premium and approachable.',
-      gradient: 'from-elegant-navy-dark to-elegant-navy-medium',
-    },
-    {
-      name: 'Community Builders',
-      role: 'Ecosystem Developers',
-      description: 'Building the network of organizations, participants, and partners that make the platform thrive.',
-      gradient: 'from-elegant-brown-medium to-elegant-brown-light',
-    },
-    {
-      name: 'Tech Innovators',
-      role: 'Platform Engineers',
-      description: 'Ensuring scalability, security, and seamless user experiences with robust infrastructure.',
-      gradient: 'from-elegant-green-medium to-elegant-green-dark',
-    },
-    {
-      name: 'Youth Leaders',
-      role: 'Community Advocates',
-      description: 'Connecting young people across Europe and fostering meaningful relationships through events.',
-      gradient: 'from-elegant-navy-medium to-elegant-brown-light',
-    },
-  ]
+  // Simplified stats for demo
+  const stats = {
+    upcomingEvents: 12,
+    totalParticipants: 1250,
+    totalOrganizations: 45,
+    acceptedApplications: 890,
+  };
 
-  // Timeline data
-  const timelineData = [
-    { 
-      year: '1998', 
-      title: 'Early International Mobility Initiative', 
-      description: 'Foundation of cross-border educational exchange programs across Europe',
-      glow: 'from-elegant-green-dark to-elegant-green-medium'
+  const creators = [
+    {
+      name: "Andrei",
+      role: "Volunteer",
+      description: "Passionate about connecting people through events.",
+      gradient: "from-blue-400 to-blue-600"
     },
-    { 
-      year: '2004', 
-      title: 'Expansion of Educational Partnerships', 
-      description: 'Major expansion connecting universities and institutions across member states',
-      glow: 'from-elegant-navy-dark to-elegant-navy-medium'
+    {
+      name: "Maria",
+      role: "Organizer",
+      description: "Creating meaningful experiences for everyone.",
+      gradient: "from-green-400 to-green-600"
     },
-    { 
-      year: '2010', 
-      title: 'Mobility Grants First Introduced', 
-      description: 'Financial support system launched to enable wider participation',
-      glow: 'from-elegant-brown-medium to-elegant-brown-light'
-    },
-    { 
-      year: '2014', 
-      title: 'Major Program Restructuring', 
-      description: 'Comprehensive reform enhancing program accessibility and impact',
-      glow: 'from-elegant-green-medium to-elegant-green-dark'
-    },
-    { 
-      year: '2020', 
-      title: 'Digital Collaboration Rollout', 
-      description: 'Transition to digital platforms enabling remote and hybrid exchanges',
-      glow: 'from-elegant-navy-medium to-elegant-brown-light'
-    },
-    { 
-      year: '2024', 
-      title: 'Cross-Country Youth Innovation Labs', 
-      description: 'Launch of innovation-focused programs connecting young entrepreneurs',
-      glow: 'from-elegant-brown-light to-elegant-green-medium'
-    },
-  ]
+    {
+      name: "Elena",
+      role: "Participant",
+      description: "Found my path through Erasmus+ projects.",
+      gradient: "from-purple-400 to-purple-600"
+    }
+  ];
 
   return (
-    <div className="min-h-screen bg-[#FAF9F6] overflow-hidden" style={{ fontFamily: 'var(--font-inter-tight)' }}>
-      {/* Transparent Title Section */}
-      <TransparentTitleSection />
-      
-      {/* Hero Section with Draggable Gallery */}
-      <motion.section
-        ref={heroRef}
-        className="relative min-h-screen flex items-center justify-center overflow-hidden bg-elegant-navy-dark"
-        style={{ scale: heroScale }}
-      >
-        {/* 10% Global Opacity Reduction Overlay */}
-        <div className="absolute inset-0 bg-black/10 z-10 pointer-events-none" />
-        {/* Desktop interactive gallery */}
-        <div className="hidden md:block">
-          <DraggableGallery />
-        </div>
-        {/* Mobile static background fallback */}
-        <div
-          className="absolute inset-0 md:hidden"
-          style={{
-            backgroundImage: 'url(https://i.pinimg.com/1200x/24/8c/7b/248c7b9c002815db9beec55c90ebbd9a.jpg)',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-          }}
-          aria-hidden
-        />
-        
-        {/* Centered Info Container */}
+    <div className="min-h-screen bg-background overflow-x-hidden relative">
+      <IntroSplash />
+      {/* NEW HERO SECTION */}
+      <section className="h-screen w-full bg-[#003399] flex flex-col items-center justify-start pt-32 text-white relative z-10 overflow-hidden">
         <motion.div
-          className="relative z-30 max-w-2xl mx-auto px-4 sm:px-6 lg:px-8"
-          initial={{ y: 50 }}
-          animate={heroInView ? { y: 0 } : {}}
-          transition={{ duration: 1, ease: 'easeOut' }}
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.8 }}
+          className="text-center"
         >
-          <motion.div
-            className="relative bg-[#F8F3EB] rounded-3xl p-6 md:p-10 shadow-2xl border border-white/20"
-            style={{
-              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.2)',
-            }}
-            whileHover={{ scale: 1.01 }}
-            transition={{ duration: 0.3 }}
-          >
-            <div className="text-center space-y-5">
-              {/* Headline */}
-              <motion.h1
-                className="text-4xl md:text-6xl lg:text-7xl font-black text-[#0B1D3A] leading-tight tracking-tight"
-                initial={{ y: 20 }}
-                animate={heroInView ? { y: 0 } : {}}
-                transition={{ duration: 0.8, delay: 0.2 }}
-                style={{ fontFamily: 'var(--font-inter-tight)' }}
-              >
-                Step Into the{' '}
-                <span className="text-[#0B1D3A]">
-                  <Typewriter text="Erasmus+ World" delay={80} />
-              </span>
-              </motion.h1>
-
-              {/* Supporting text */}
-              <motion.p
-                className="text-base md:text-lg text-[#0B1D3A] leading-relaxed font-bold max-w-xl mx-auto"
-                initial={{ y: 20 }}
-                animate={heroInView ? { y: 0 } : {}}
-                transition={{ duration: 0.8, delay: 0.4 }}
-              >
-                Discover transformative event experiences that connect young people across Europe. 
-                Join a vibrant community building meaningful connections through verified Erasmus+ events.
-              </motion.p>
-
-              {/* CTA Button with Stars */}
-              <motion.div
-                className="relative inline-block"
-                initial={{ y: 20 }}
-                animate={heroInView ? { y: 0 } : {}}
-                transition={{ delay: 0.6 }}
-              >
-                {/* Floating Stars */}
-                {[
-                  { x: -30, y: -15, delay: 0 },
-                  { x: -20, y: -25, delay: 0.3 },
-                  { x: 10, y: -30, delay: 0.6 },
-                  { x: 25, y: -20, delay: 0.9 },
-                  { x: 35, y: -10, delay: 1.2 },
-                  { x: -15, y: 20, delay: 0.2 },
-                  { x: 15, y: 25, delay: 0.5 },
-                  { x: 30, y: 15, delay: 0.8 },
-                ].map((star, i) => (
-                  <motion.div
-                    key={i}
-                    className="absolute"
-                    style={{
-                      left: `${star.x}px`,
-                      top: `${star.y}px`,
-                    }}
-                    animate={{
-                      y: [0, -8, 0],
-                      rotate: [0, 180, 360],
-                      opacity: [0.7, 1, 0.7],
-                      scale: [1, 1.2, 1],
-                    }}
-                    transition={{
-                      duration: 2.5 + i * 0.3,
-                      repeat: Infinity,
-                      delay: star.delay,
-                    }}
-                  >
-                    <Star 
-                      className="w-4 h-4 text-[#D4AF37]" 
-                      fill="currentColor"
-                      style={{
-                        filter: 'drop-shadow(0 0 6px rgba(212, 175, 55, 0.9))',
-                      }}
-                    />
-                  </motion.div>
-                ))}
-                
-                <Link
-                  href="/auth"
-                  className="group relative inline-flex items-center gap-3 bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] text-elegant-navy-dark px-8 py-4 rounded-lg font-bold text-lg hover:from-[#F4D03F] hover:to-[#D4AF37] transition-all duration-300 shadow-xl hover:shadow-2xl hover:scale-105 z-10"
-                  style={{
-                    boxShadow: '0 4px 20px rgba(212, 175, 55, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
-                  }}
-                >
-                  Join the Community
-                  <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
-              </Link>
-              </motion.div>
-            </div>
-          </motion.div>
+          <h1 className="text-5xl md:text-7xl font-black tracking-tighter mb-4">
+            ERASMUS+ CONNECT
+          </h1>
+          <p className="text-sm md:text-base font-light tracking-widest uppercase opacity-80">
+            developed by scout society
+          </p>
         </motion.div>
 
-        {/* Scroll indicator */}
         <motion.div
-          className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20"
-          animate={{ y: [0, 10, 0] }}
-          transition={{ duration: 2, repeat: Infinity }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.3 }}
+          className="mt-6 relative z-10 px-4"
         >
-          <div className="w-6 h-10 border-2 border-white/30 rounded-full flex justify-center">
-            <motion.div
-              className="w-1 h-3 bg-white/50 rounded-full mt-2"
-              animate={{ y: [0, 12, 0] }}
-              transition={{ duration: 2, repeat: Infinity }}
-            />
-          </div>
+          <Image
+            src="/images/home_page.png"
+            alt="Erasmus+ Connect"
+            width={1000}
+            height={600}
+            className="object-contain max-h-[50vh] w-auto drop-shadow-2xl"
+            priority
+          />
         </motion.div>
-      </motion.section>
-
-      {/* Erasmus+ Historical Timeline */}
-      <section
-        ref={impactRef}
-        className="relative py-32 bg-[#FAF9F6] overflow-hidden"
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <motion.div
-            className="text-center mb-20"
-            initial={{ opacity: 0, y: 30 }}
-            animate={impactInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ delay: 0.2 }}
-          >
-            <h2 className="text-5xl md:text-6xl font-black text-elegant-navy-dark mb-6 tracking-tight" style={{ fontFamily: 'var(--font-inter-tight)' }}>
-              Erasmus+ Historical Evolution
-            </h2>
-            <p className="text-xl text-elegant-green-dark max-w-2xl mx-auto font-light">
-              A journey of connection, growth, and innovation across Europe
-            </p>
-          </motion.div>
-
-          {/* Horizontal Timeline */}
-          <div className="relative pt-20 pb-24 md:pt-24 md:pb-32">
-            {/* Strong Navy Blue Timeline Axis */}
-            <div className="absolute top-1/2 left-0 right-0 h-3 bg-[#0B1D3A] hidden md:block -translate-y-1/2 shadow-2xl" 
-              style={{
-                boxShadow: '0 0 30px rgba(11, 29, 58, 0.8), 0 4px 8px rgba(0, 0, 0, 0.3)',
-              }}
-            />
-            
-            {/* EU Flags Above Timeline */}
-            <div className="absolute top-1/2 left-0 right-0 hidden md:block -translate-y-[140px]">
-              {[
-                { country: 'IT', url: 'https://seekflag.com/wp-content/uploads/2021/12/Flag-of-Italy-01-1.svg', size: 42 },
-                { country: 'FR', url: 'https://seekflag.com/wp-content/uploads/2021/11/Flag-of-France-01-1.svg', size: 38 },
-                { country: 'DE', url: 'https://seekflag.com/wp-content/uploads/2021/11/Flag-of-Germany-01-1.svg', size: 40 },
-                { country: 'BE', url: 'https://seekflag.com/wp-content/uploads/2021/11/Flag-of-Belgian-01-1.svg', size: 36 },
-                { country: 'PL', url: 'https://seekflag.com/wp-content/uploads/2022/01/Poland-01-1.svg', size: 34 },
-                { country: 'PT', url: 'https://seekflag.com/wp-content/uploads/2021/12/portugal-01-1.svg', size: 38 },
-                { country: 'ES', url: 'https://seekflag.com/wp-content/uploads/2021/12/Flag-of-Spain-01-2.svg', size: 40 },
-                { country: 'RO', url: 'https://seekflag.com/wp-content/uploads/2021/12/romania-01-1.svg', size: 36 },
-                { country: 'GR', url: 'https://seekflag.com/wp-content/uploads/2021/11/Flag-of-Greece-01-1.svg', size: 34 },
-                { country: 'BG', url: 'https://seekflag.com/wp-content/uploads/2021/11/Flag-of-Bulgaria-01.svg', size: 32 },
-              ].map((flag, index) => (
-                <motion.div
-                  key={flag.country}
-                  className="absolute"
-                  style={{
-                    left: `${6 + index * 9.5}%`,
-                  }}
-                  initial={{ opacity: 0, y: -20 }}
-                  animate={impactInView ? { opacity: 1, y: 0 } : {}}
-                  transition={{ delay: index * 0.1, type: 'spring', stiffness: 100 }}
-                  whileHover={{ y: -8, scale: 1.15 }}
-                >
-                  <motion.img
-                    src={flag.url}
-                    alt={flag.country}
-                    width={flag.size}
-                    height={flag.size * 0.67}
-                    className="rounded shadow-lg"
-                    animate={{
-                      y: [0, -10, 0],
-                    }}
-                    transition={{
-                      duration: 3 + index * 0.3,
-                      repeat: Infinity,
-                      delay: index * 0.2,
-                    }}
-                    style={{
-                      filter: 'drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3)) drop-shadow(0 0 12px rgba(11, 29, 58, 0.2))',
-                    }}
-                  />
-                </motion.div>
-              ))}
-            </div>
-            
-            {/* Year Labels Below Flags, Above Cards */}
-            <div className="absolute top-1/2 left-0 right-0 hidden md:block -translate-y-[70px] z-10">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-                <div className="grid grid-cols-6 gap-6">
-                  {timelineData.map((milestone, index) => (
-                    <motion.div
-                      key={index}
-                      className="flex justify-center"
-                      initial={{ opacity: 0, scale: 0 }}
-                      animate={impactInView ? { opacity: 1, scale: 1 } : {}}
-                      transition={{ delay: index * 0.15 + 0.3 }}
-                    >
-                      <div className="bg-[#0B1D3A] px-4 py-1.5 rounded-full text-sm font-black text-white shadow-lg min-w-[70px] text-center"
-                        style={{
-                          boxShadow: '0 4px 12px rgba(11, 29, 58, 0.5)',
-                        }}
-                      >
-                        {milestone.year}
-              </div>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 mt-8">
-              {timelineData.map((milestone, index) => (
-                <motion.div
-                  key={index}
-                  className="relative"
-                  initial={{ opacity: 0, y: 50, scale: 0.8 }}
-                  animate={impactInView ? { opacity: 1, y: 0, scale: 1 } : {}}
-                  transition={{ delay: index * 0.15, type: 'spring', stiffness: 100 }}
-                  whileHover={{ scale: 1.05, y: -5 }}
-                >
-                  {/* Milestone Card */}
-                  <motion.div
-                    className={`relative mt-8 md:mt-0 md:top-1/2 p-6 rounded-xl bg-white border-2 border-[#0B1D3A]/20 shadow-lg max-w-full min-h-[220px]`}
-                    whileHover={{
-                      boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
-                    }}
-                  >
-                    <h3 className="text-base font-bold text-[#0B1D3A] mb-2 leading-tight">{milestone.title}</h3>
-                    <p className="text-xs text-elegant-green-dark leading-relaxed font-medium">{milestone.description}</p>
-                  </motion.div>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        </div>
       </section>
 
-      {/* Creator Section */}
-      <motion.section
-        ref={creatorRef}
-        className="relative py-32 overflow-hidden"
-        initial={{ opacity: 0 }}
-        animate={creatorInView ? { opacity: 1 } : {}}
-        transition={{ duration: 0.8 }}
-      >
-        {/* Background Image */}
-        <div 
-          className="absolute inset-0"
-          style={{
-            backgroundImage: 'url(https://i.pinimg.com/1200x/e8/c4/5c/e8c45c28eaa6c5e97ec64c8344716538.jpg)',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-          }}
-        />
-        
-        {/* Soft Opacity Overlay */}
-        <div className="absolute inset-0 bg-white/70" />
-        
-        {/* Floating Stars */}
-        {[
-          { left: 10, top: 15, xOffset: 5, duration: 8, delay: 0 },
-          { left: 25, top: 30, xOffset: -8, duration: 10, delay: 0.5 },
-          { left: 45, top: 20, xOffset: 6, duration: 9, delay: 1 },
-          { left: 60, top: 40, xOffset: -5, duration: 11, delay: 1.5 },
-          { left: 75, top: 25, xOffset: 7, duration: 8.5, delay: 0.3 },
-          { left: 15, top: 60, xOffset: -6, duration: 9.5, delay: 0.8 },
-          { left: 35, top: 70, xOffset: 4, duration: 10.5, delay: 1.2 },
-          { left: 55, top: 55, xOffset: -7, duration: 8.8, delay: 0.6 },
-          { left: 80, top: 65, xOffset: 5, duration: 9.2, delay: 1.8 },
-          { left: 20, top: 80, xOffset: -4, duration: 10.2, delay: 0.4 },
-          { left: 50, top: 85, xOffset: 6, duration: 8.7, delay: 1.1 },
-          { left: 70, top: 75, xOffset: -5, duration: 9.8, delay: 0.7 },
-          { left: 30, top: 45, xOffset: 4, duration: 10.3, delay: 1.4 },
-          { left: 65, top: 50, xOffset: -6, duration: 8.9, delay: 0.9 },
-          { left: 85, top: 35, xOffset: 5, duration: 9.6, delay: 1.6 },
-        ].map((star, i) => (
-          <motion.div
-            key={i}
-            className="absolute pointer-events-none"
-            style={{
-              left: `${star.left}%`,
-              top: `${star.top}%`,
-            }}
-            animate={{
-              y: [0, -30, 0],
-              x: [0, star.xOffset, 0],
-              opacity: [0.3, 0.7, 0.3],
-              rotate: [0, 180, 360],
-            }}
-            transition={{
-              duration: star.duration,
-              repeat: Infinity,
-              delay: star.delay,
-            }}
-          >
-            <Star 
-              className="w-3 h-3 text-[#D4AF37]" 
-              fill="currentColor"
-              style={{
-                filter: 'drop-shadow(0 0 4px rgba(212, 175, 55, 0.6))',
-              }}
-            />
-          </motion.div>
-        ))}
-        
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <motion.div
-            className="text-center mb-20"
-            initial={{ opacity: 0, y: 30 }}
-            animate={creatorInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ delay: 0.2 }}
-          >
-            <h2 className="text-5xl md:text-6xl font-black text-elegant-navy-dark mb-6 tracking-tight" style={{ fontFamily: 'var(--font-inter-tight)' }}>
-              Our Creators
-            </h2>
-            <p className="text-xl text-elegant-green-dark max-w-2xl mx-auto font-light">
-              Meet the passionate team building the future of European connections
-            </p>
-          </motion.div>
+      {/* CONTENT STARTING BELOW HERO */}
+      <div className="relative">
+        <GlobalBlueLine />
 
-          {/* Creator Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-            {creators.map((creator, index) => (
-              <motion.div
-                key={index}
-                className="bg-white rounded-3xl p-6 border border-elegant-navy-dark/10 shadow-lg overflow-hidden group"
-                initial={{ opacity: 0, y: 50 }}
-                animate={creatorInView ? { opacity: 1, y: 0 } : {}}
-                transition={{ delay: index * 0.1, type: 'spring', stiffness: 100 }}
-                whileHover={{ scale: 1.05, y: -8, boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)' }}
-              >
-                {/* Photo placeholder */}
-                <div className={`w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br ${creator.gradient} shadow-lg flex items-center justify-center text-white text-2xl font-black`}>
-                  {creator.name.charAt(0)}
+        {/* SECTION 1.5: WHO WE ARE */}
+        <div className="relative z-20 py-24 w-full flex justify-center items-center">
+
+          <div className="relative w-[75%] max-w-[80rem] transform scale-95 origin-top">
+            {/* Decorative Images - Positioned ON TOP of the card */}
+
+            <div className="absolute top-[80%] -right-20 md:-right-32 -translate-y-1/2 w-56 md:w-80 z-30 animate-float-delayed">
+              <Image src="/images/Cool Kids - Brainstorming.png" alt="Brainstorming" width={400} height={400} className="w-full h-auto drop-shadow-2xl" />
             </div>
 
-                <h3 className="text-xl font-bold text-elegant-navy-dark mb-2 text-center" style={{ fontFamily: 'var(--font-inter-tight)' }}>
-                  {creator.name}
+            <div className="w-full bg-[#003399]/90 backdrop-blur-sm rounded-[3rem] p-8 md:p-14 shadow-2xl relative overflow-hidden z-20">
+              {/* Decorative background element */}
+              <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full -mr-24 -mt-24 blur-3xl pointer-events-none" />
+              <div className="absolute bottom-0 left-0 w-64 h-64 bg-white/5 rounded-full -ml-16 -mb-16 blur-2xl pointer-events-none" />
+
+              <div className="text-center relative z-10">
+                <h2 className="text-sm md:text-base font-bold text-blue-300 uppercase tracking-[0.2em] mb-6">
+                  WHO WE ARE
+                </h2>
+
+                <h3 className="text-2xl md:text-4xl font-bold text-white mb-8 leading-tight max-w-5xl mx-auto">
+                  Erasmus+ Connect is a platform built for <span className="text-blue-200">young people</span> who want to explore Europe and for the <span className="text-blue-200">organisations</span> that make it possible.
                 </h3>
-                <p className="text-sm text-elegant-green-dark font-semibold mb-3 text-center">{creator.role}</p>
-                <p className="text-sm text-elegant-navy-medium leading-relaxed font-light text-center">
-                  {creator.description}
-                </p>
-              </motion.div>
-            ))}
+
+                <div className="space-y-6 text-lg md:text-xl text-blue-50/90 leading-relaxed max-w-4xl mx-auto font-light">
+                  <p>
+                    We help young people <span className="font-semibold text-white">discover meaningful opportunities</span> across Europe — and find trusted organisations to guide them along the way. We help youth organisations grow their visibility, connect with reliable partners, and get verified so young people can trust them.
+                  </p>
+                  <div className="pt-6">
+                    <p className="font-bold text-xl md:text-2xl text-white tracking-widest border-t border-white/20 pt-6 inline-block px-12">
+                      SIMPLE. TRANSPARENT. EUROPEAN.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </motion.section>
 
-      {/* Our Impact Section */}
-      <motion.section
-        ref={whyChooseRef}
-        className="relative py-32 bg-[#FAF9F6] overflow-hidden"
-        initial={{ opacity: 0 }}
-        animate={whyChooseInView ? { opacity: 1 } : {}}
-        transition={{ duration: 0.8 }}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <motion.div
-            className="text-center mb-20"
-            initial={{ opacity: 0, y: 30 }}
-            animate={whyChooseInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ delay: 0.2 }}
-          >
-            <h2 
-              className="text-5xl md:text-6xl font-black text-elegant-navy-dark mb-6 tracking-tight" 
-              style={{ fontFamily: 'var(--font-inter-tight)' }}
-            >
-              Our Impact
+        {/* SECTION 1.8: MEET US */}
+        <div className="relative z-20 pb-24 w-full">
+          <div className="max-w-7xl mx-auto px-4 transform scale-95 origin-top">
+            <div className="flex justify-center mb-16">
+              <div className="relative py-4 px-12 md:px-24 w-full max-w-lg flex justify-center items-center">
+                {/* Background Box */}
+                <div className="absolute inset-0 bg-white rounded-full shadow-lg border border-blue-100/50" />
+
+                {/* Text */}
+                <h2 className="relative z-10 text-4xl md:text-5xl font-black text-[#003399] text-center tracking-tight">
+                  MEET US
+                </h2>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
+              {/* Card 1: Andrei */}
+              <div className="bg-white rounded-3xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-blue-50 flex flex-col items-center text-center">
+                <div className="aspect-square relative mb-6 rounded-2xl overflow-hidden shadow-md w-full">
+                  <Image
+                    src="/images/andrei.jpeg"
+                    alt="Andrei Cristea"
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+                <h3 className="text-2xl font-bold text-[#003399] mb-2">Andrei Cristea</h3>
+                <p className="text-blue-600 font-medium tracking-wide uppercase text-sm mb-4">Technical Lead & Backend Developer</p>
+                <div className="w-12 h-1 bg-blue-100 rounded-full mb-6"></div>
+                <a
+                  href="https://www.linkedin.com/in/andrei1cristea/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block px-6 py-2 bg-[#003399]/80 text-white font-bold rounded-full hover:bg-[#003399] transition-all text-sm uppercase tracking-wider shadow-lg hover:shadow-xl transform hover:scale-105"
+                >
+                  More about me
+                </a>
+              </div>
+
+              {/* Card 2: Ciprian */}
+              <div className="bg-white rounded-3xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-blue-50 flex flex-col items-center text-center">
+                <div className="aspect-square relative mb-6 rounded-2xl overflow-hidden shadow-md w-full">
+                  <Image
+                    src="/images/ciprian.jpg"
+                    alt="Ciprian Sfîrlogea"
+                    fill
+                    className="object-cover object-top"
+                  />
+                </div>
+                <h3 className="text-2xl font-bold text-[#003399] mb-2">Ciprian Sfîrlogea</h3>
+                <p className="text-blue-600 font-medium tracking-wide uppercase text-sm mb-4">Scout Society Founder</p>
+                <div className="w-12 h-1 bg-blue-100 rounded-full mb-6"></div>
+                <a
+                  href="https://www.linkedin.com/in/ciprian-sfirlogea-45688310/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block px-6 py-2 bg-[#003399]/80 text-white font-bold rounded-full hover:bg-[#003399] transition-all text-sm uppercase tracking-wider shadow-lg hover:shadow-xl transform hover:scale-105"
+                >
+                  More about me
+                </a>
+              </div>
+
+              {/* Card 3: Maria */}
+              <div className="bg-white rounded-3xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-blue-50 flex flex-col items-center text-center">
+                <div className="aspect-square relative mb-6 rounded-2xl overflow-hidden shadow-md w-full">
+                  <Image
+                    src="/images/maria.jpeg"
+                    alt="Maria Dăianu"
+                    fill
+                    className="object-cover object-[50%_25%]"
+                  />
+                </div>
+                <h3 className="text-2xl font-bold text-[#003399] mb-2">Maria Dăianu</h3>
+                <p className="text-blue-600 font-medium tracking-wide uppercase text-sm mb-4">Marketing Lead & Frontend Developer</p>
+                <div className="w-12 h-1 bg-blue-100 rounded-full mb-6"></div>
+                <a
+                  href="https://www.linkedin.com/in/maria-daianu-150640331/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block px-6 py-2 bg-[#003399]/80 text-white font-bold rounded-full hover:bg-[#003399] transition-all text-sm uppercase tracking-wider shadow-lg hover:shadow-xl transform hover:scale-105"
+                >
+                  More about me
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* SECTION 1.9: FOR YOUNG PEOPLE */}
+        <div className="relative z-20 py-24 w-full">
+          <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center gap-12 md:gap-24 transform scale-95 origin-top">
+            {/* Left Column: Text */}
+            <div className="flex-1 text-left relative z-10 md:pl-8 lg:pl-16">
+              <div className="bg-white/90 backdrop-blur-sm rounded-3xl p-6 md:p-10 shadow-sm border border-blue-50/50">
+                <h2 className="text-3xl md:text-5xl font-black text-[#003399] mb-6 tracking-tight leading-tight">
+                  For Young People
+                </h2>
+                <p className="text-lg md:text-xl text-blue-900/80 mb-6 leading-relaxed font-light">
+                  <span className="font-semibold text-blue-600">Discover verified European opportunities</span> tailored to you. Browse trusted Erasmus+ projects, apply directly through our platform, and get personalised recommendations based on your interests and goals.
+                </p>
+                <p className="text-lg md:text-xl text-blue-900/80 mb-8 leading-relaxed font-light">
+                  Whether you're looking for volunteering, training, or youth exchanges — we help you find the right experience and the right organisation to make it happen.
+                </p>
+                <p className="text-xl md:text-2xl font-bold text-[#003399] tracking-wide border-l-4 border-yellow-400 pl-6 py-2">
+                  Safe. Simple. Made for you.
+                </p>
+              </div>
+            </div>
+
+            {/* Right Column: Images */}
+            <div className="flex-1 relative w-full min-h-[400px] flex justify-center items-center md:pr-8 lg:pr-16">
+              {/* Main Image (Center) */}
+              <Image
+                src="/images/Cool Kids - On Wheels.png"
+                alt="Young People on Wheels"
+                width={300}
+                height={300}
+                className="relative z-20 w-48 md:w-64 h-auto drop-shadow-2xl object-contain animate-float-slow"
+              />
+
+              {/* Boy Skate (Top Right) */}
+              <div className="absolute top-0 right-4 md:right-12 z-10 animate-float-delayed">
+                <Image
+                  src="/images/boy_skate.png"
+                  alt="Skater"
+                  width={200}
+                  height={200}
+                  className="w-32 md:w-40 h-auto drop-shadow-xl object-contain rotate-12"
+                />
+              </div>
+
+              {/* Nomad Map (Bottom Left) */}
+              <div className="absolute bottom-4 left-4 md:left-12 z-0 animate-float-slower">
+                <Image
+                  src="/images/nomad_map.png"
+                  alt="Map"
+                  width={200}
+                  height={200}
+                  className="w-32 md:w-40 h-auto drop-shadow-lg object-contain -rotate-12 opacity-90"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* SECTION 1.10: FOR ORGANISATIONS */}
+        <div className="relative z-20 py-24 w-full">
+          <div className="max-w-7xl mx-auto px-4 flex flex-col-reverse md:flex-row items-center gap-12 md:gap-24 transform scale-95 origin-top">
+            {/* Left Column: Images */}
+            <div className="flex-1 relative w-full min-h-[400px] flex justify-center items-center md:pl-8 lg:pl-16">
+              {/* Main Image */}
+              <Image
+                src="/images/Stuck at Home - To Do List.png"
+                alt="Organisations Planning"
+                width={300}
+                height={300}
+                className="relative z-20 w-48 md:w-64 h-auto drop-shadow-2xl object-contain animate-float-delayed"
+              />
+
+              {/* Stats and Graphs */}
+              <div className="absolute -bottom-4 right-12 md:bottom-0 md:-right-8 z-30 animate-float-slower">
+                <Image
+                  src="/images/Stuck at Home - Stats and Graphs.png"
+                  alt="Stats and Graphs"
+                  width={200}
+                  height={200}
+                  className="w-32 md:w-40 h-auto drop-shadow-xl object-contain -rotate-6"
+                />
+              </div>
+
+              {/* Boy Stand */}
+              <div className="absolute top-0 left-4 md:left-0 z-30 animate-float-delayed">
+                <Image
+                  src="/images/boy_stand.png"
+                  alt="Boy Standing"
+                  width={200}
+                  height={200}
+                  className="w-24 md:w-32 h-auto drop-shadow-xl object-contain rotate-6"
+                />
+              </div>
+            </div>
+
+            {/* Right Column: Text */}
+            <div className="flex-1 text-right relative z-10 md:pr-8 lg:pr-16">
+              <div className="bg-white/90 backdrop-blur-sm rounded-3xl p-6 md:p-10 shadow-sm border border-blue-50/50">
+                <h2 className="text-3xl md:text-5xl font-black text-[#003399] mb-6 tracking-tight leading-tight">
+                  For Organisations
+                </h2>
+                <p className="text-lg md:text-xl text-blue-900/80 mb-6 leading-relaxed font-light">
+                  <span className="font-semibold text-blue-600">Get verified, get visible, get connected.</span> Post your projects, reach motivated young people across Europe, and choose participants who match your vision. Connect with trusted partner organisations to co-create new projects and grow your impact.
+                </p>
+                <p className="text-lg md:text-xl text-blue-900/80 mb-8 leading-relaxed font-light">
+                  We help you build the network and visibility you need to make your work go further.
+                </p>
+                <p className="text-xl md:text-2xl font-bold text-[#003399] tracking-wide border-r-4 border-yellow-400 pr-6 py-2">
+                  Trusted. Collaborative. Built for growth.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* SECTION 1.20: FEATURED OPPORTUNITIES */}
+        <div className="relative z-20 py-24 w-full bg-gradient-to-b from-transparent to-blue-50/30">
+          <div className="max-w-7xl mx-auto px-4 transform scale-95 origin-top">
+            <div className="text-center mb-16">
+              <h2 className="text-4xl md:text-5xl font-black text-[#003399] tracking-tight mb-4">
+                Featured Opportunities
+              </h2>
+              <p className="text-xl text-blue-900/60 max-w-2xl mx-auto font-light">
+                Discover life-changing experiences across Europe.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+              {loadingOps ? (
+                // Loading Skeleton
+                [1, 2, 3].map((i) => (
+                  <div key={i} className="bg-white rounded-3xl h-96 animate-pulse border border-blue-50 shadow-sm">
+                    <div className="h-48 bg-blue-50/50 w-full"></div>
+                    <div className="p-6 space-y-4">
+                      <div className="h-4 bg-blue-50 rounded w-1/3"></div>
+                      <div className="h-8 bg-blue-100 rounded w-3/4"></div>
+                      <div className="h-4 bg-blue-50 rounded w-1/2"></div>
+                    </div>
+                  </div>
+                ))
+              ) : opportunities.length > 0 ? (
+                opportunities.map((opp) => (
+                  <div key={opp.id} className="group bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-blue-100 flex flex-col h-full">
+                    <div className="relative h-48 w-full overflow-hidden shrink-0">
+                      <Image
+                        src={opp.photo_url || "/images/boy_sport.png"}
+                        alt={opp.title}
+                        fill
+                        className="object-cover group-hover:scale-110 transition-transform duration-500"
+                      />
+                      {opp.is_active && (
+                        <div className="absolute top-4 right-4 bg-yellow-400 text-blue-900 text-xs font-bold px-3 py-1 rounded-full shadow-sm">
+                          OPEN
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-6 flex flex-col flex-1">
+                      <div className="text-sm text-blue-500 font-semibold mb-2 uppercase tracking-wider">
+                        {opp.event_type || 'Erasmus+ Project'}
+                      </div>
+                      <h3 className="text-xl font-bold text-[#003399] mb-3 line-clamp-2 leading-tight group-hover:text-blue-600 transition-colors">
+                        {opp.title}
+                      </h3>
+                      <div className="flex items-center text-gray-500 text-sm mb-4 mt-auto gap-4">
+                        <span className="flex items-center"><span className="mr-2">📅</span> {new Date(opp.start_date || Date.now()).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                        <span className="flex items-center truncate"><span className="mr-2">📍</span> {opp.city || opp.location || 'Europe'}</span>
+                      </div>
+                      <Link href={`/events/${opp.id}`} className="inline-flex items-center text-blue-600 font-bold hover:gap-2 transition-all mt-2">
+                        View Details <ArrowRight className="w-4 h-4 ml-2" />
+                      </Link>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="col-span-full text-center py-16 bg-blue-50/30 rounded-3xl border border-blue-50">
+                  <p className="text-blue-900/60 text-lg">No active opportunities found at the moment.</p>
+                  <p className="text-sm text-blue-900/40 mt-2">Check back soon for new projects!</p>
+                </div>
+              )}
+            </div>
+
+            <div className="text-center">
+              <Link href="/events" className="inline-block bg-[#003399] text-white px-8 py-4 rounded-full font-bold text-lg hover:bg-blue-800 transition-all hover:scale-105 shadow-xl hover:shadow-2xl">
+                Discover More Opportunities
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* SECTION 1.30: VERIFIED ORGANISATIONS */}
+        <div className="relative z-20 py-24 w-full">
+          <div className="max-w-7xl mx-auto px-4 transform scale-95 origin-top">
+            <div className="flex flex-col items-center text-center mb-12 gap-6">
+              <div>
+                <h2 className="text-4xl md:text-5xl font-black text-[#003399] tracking-tight mb-4">
+                  Trusted Organizations
+                </h2>
+                <p className="text-xl text-blue-900/60 font-light max-w-xl mx-auto">
+                  Connect with verified organizations that are making a real impact.
+                </p>
+              </div>
+              <Link href="/organizations" className="hidden md:inline-flex items-center text-blue-600 font-bold hover:gap-2 transition-all">
+                View All Organizations <ArrowRight className="w-5 h-5 ml-2" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+              {loadingOrgs ? (
+                // Skeleton
+                [1, 2].map((i) => (
+                  <div key={i} className="flex flex-col sm:flex-row items-center gap-6 bg-white p-8 rounded-3xl shadow-lg border border-blue-50 animate-pulse">
+                    <div className="w-24 h-24 bg-blue-50 rounded-full shrink-0"></div>
+                    <div className="flex-1 space-y-4 w-full">
+                      <div className="h-6 bg-blue-100 rounded w-1/2"></div>
+                      <div className="h-4 bg-blue-50 rounded w-full"></div>
+                      <div className="h-4 bg-blue-50 rounded w-2/3"></div>
+                    </div>
+                  </div>
+                ))
+              ) : organizationsList.length > 0 ? (
+                organizationsList.map((org, idx) => (
+                  <div key={org.id} className="flex flex-col sm:flex-row items-center gap-6 bg-white p-8 rounded-3xl shadow-lg border border-blue-50 hover:border-blue-200 transition-all">
+                    <div className="w-24 h-24 relative shrink-0 overflow-hidden rounded-full border border-blue-50 bg-white p-2">
+                      <Image
+                        src={org.logo_url || (idx % 2 === 0 ? "/images/nomad_passport.png" : "/images/nomad_backpack.png")}
+                        alt={org.organization_name}
+                        fill
+                        className="object-contain"
+                      />
+                    </div>
+                    <div className="text-center sm:text-left flex-1 min-w-0">
+                      <div className="flex items-center justify-center sm:justify-start gap-2 mb-2 flex-wrap">
+                        <h3 className="text-2xl font-bold text-gray-900 truncate max-w-full">{org.organization_name}</h3>
+                        {org.is_verified && (
+                          <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0">Verified</span>
+                        )}
+                      </div>
+                      <p className="text-gray-500 mb-4 line-clamp-2">
+                        {org.bio || "Empowering youth through European opportunities."}
+                      </p>
+                      <Link href={`/organizations/${org.id ?? slugifyOrganizationName(org.organization_name)}`} className="text-blue-600 font-bold text-sm hover:underline">View Profile</Link>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="col-span-full text-center py-12 bg-blue-50/30 rounded-3xl">
+                  <p className="text-blue-900/60">No verified organizations found.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="text-center md:hidden">
+              <Link href="/organizations" className="inline-block bg-white text-[#003399] border-2 border-[#003399] px-8 py-3 rounded-full font-bold hover:bg-blue-50 transition-all">
+                View All Organizations
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* SECTION 1.35: TRUST INDICATORS */}
+        <div className="relative z-20 py-24 bg-blue-900 w-full text-white overflow-hidden">
+          {/* Background decoration */}
+          <div className="absolute top-0 left-0 w-full h-full overflow-hidden opacity-10">
+            <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-blue-400 blur-3xl"></div>
+            <div className="absolute top-1/2 right-0 w-64 h-64 rounded-full bg-blue-300 blur-3xl"></div>
+          </div>
+
+          <div className="max-w-7xl mx-auto px-4 relative z-10 transform scale-95 origin-top">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl md:text-5xl font-black mb-6 tracking-tight">
+                Built on Trust & Transparency
+              </h2>
+              <p className="text-blue-100 text-lg max-w-2xl mx-auto font-light">
+                We prioritize safety and quality. Our platform connects you only with verified partners and official Erasmus+ opportunities.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-16">
+              {/* Stat 1 */}
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 text-center hover:bg-white/20 transition-all">
+                <div className="text-5xl font-black text-blue-200 mb-2">
+                  {trustStats.verifiedOrgs}+
+                </div>
+                <div className="text-blue-100 font-medium">Verified Organizations</div>
+              </div>
+
+              {/* Stat 2 */}
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 text-center hover:bg-white/20 transition-all">
+                <div className="text-5xl font-black text-blue-200 mb-2">
+                  {trustStats.youthHelped}+
+                </div>
+                <div className="text-blue-100 font-medium">Young People Helped</div>
+              </div>
+
+              {/* Stat 3 */}
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 text-center hover:bg-white/20 transition-all">
+                <div className="text-5xl font-black text-blue-200 mb-2">
+                  {trustStats.countries}
+                </div>
+                <div className="text-blue-100 font-medium">Countries Covered</div>
+              </div>
+
+              {/* Stat 4 - Badges / Safety */}
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 text-center hover:bg-white/20 transition-all flex flex-col justify-center items-center">
+                <div className="flex -space-x-4 mb-3 justify-center">
+                  <div className="w-12 h-12 rounded-full bg-green-500 border-2 border-blue-900 flex items-center justify-center text-white" title="Verified Partner">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                  </div>
+                  <div className="w-12 h-12 rounded-full bg-blue-500 border-2 border-blue-900 flex items-center justify-center text-white" title="Erasmus+ Accredited">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                  </div>
+                  <div className="w-12 h-12 rounded-full bg-yellow-500 border-2 border-blue-900 flex items-center justify-center text-white" title="High Safety Standards">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                  </div>
+                </div>
+                <div className="text-blue-100 font-medium">Safety & Quality Badges</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+        {/* SECTION 1.40: HOW IT WORKS */}
+        <div className="py-24 relative bg-transparent">
+          <div className="absolute inset-0 bg-gray-50 z-0"></div>
+          <div className="max-w-7xl mx-auto px-4 relative z-10 transform scale-95 origin-top">
+            <div className="text-center mb-16 relative z-10">
+              <h2 className="text-4xl md:text-5xl font-black text-[#003399] tracking-tight mb-6">
+                How It Works
+              </h2>
+              <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+                Your journey to European opportunities starts here. Simple, transparent, and built for you.
+              </p>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex justify-center mb-16 relative z-10">
+              <div className="bg-white p-1.5 rounded-full shadow-sm border border-gray-200 inline-flex">
+                <button
+                  onClick={() => setActiveTab('young-people')}
+                  className={`px-8 py-3 rounded-full text-sm font-bold transition-all ${activeTab === 'young-people'
+                    ? 'bg-[#003399] text-white shadow-md'
+                    : 'text-gray-500 hover:text-gray-900'
+                    }`}
+                >
+                  For Young People
+                </button>
+                <button
+                  onClick={() => setActiveTab('organizations')}
+                  className={`px-8 py-3 rounded-full text-sm font-bold transition-all ${activeTab === 'organizations'
+                    ? 'bg-[#003399] text-white shadow-md'
+                    : 'text-gray-500 hover:text-gray-900'
+                    }`}
+                >
+                  For Organizations
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="max-w-5xl mx-auto relative z-10">
+              {activeTab === 'young-people' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                  {/* Step 1 */}
+                  <div className="relative">
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-blue-50 h-full relative z-10">
+                      <div className="w-12 h-12 bg-blue-100 text-[#003399] rounded-xl flex items-center justify-center font-bold text-xl mb-4">1</div>
+                      <h3 className="text-lg font-bold text-gray-900 mb-2">Create Your Profile</h3>
+                      <p className="text-gray-600 text-sm">Sign up and tell us about yourself: your interests, skills, and what kind of European experience you're looking for.</p>
+                    </div>
+                    {/* Connector Line (Desktop) */}
+                    <div className="hidden lg:block absolute top-10 left-full w-12 h-8 text-blue-200 -ml-2 z-0">
+                      <svg viewBox="0 0 100 40" className="w-full h-full" fill="none" preserveAspectRatio="none">
+                        <path d="M0,20 C30,20 70,-10 100,20" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeDasharray="6 6" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  {/* Step 2 */}
+                  <div className="relative">
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-blue-50 h-full relative z-10">
+                      <div className="w-12 h-12 bg-blue-100 text-[#003399] rounded-xl flex items-center justify-center font-bold text-xl mb-4">2</div>
+                      <h3 className="text-lg font-bold text-gray-900 mb-2">Explore & Get Recommendations</h3>
+                      <p className="text-gray-600 text-sm">Browse verified projects or let us suggest opportunities that match your profile.</p>
+                    </div>
+                    <div className="hidden lg:block absolute top-10 left-full w-12 h-8 text-blue-200 -ml-2 z-0">
+                      <svg viewBox="0 0 100 40" className="w-full h-full" fill="none" preserveAspectRatio="none">
+                        <path d="M0,20 C30,20 70,50 100,20" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeDasharray="6 6" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  {/* Step 3 */}
+                  <div className="relative">
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-blue-50 h-full relative z-10">
+                      <div className="w-12 h-12 bg-blue-100 text-[#003399] rounded-xl flex items-center justify-center font-bold text-xl mb-4">3</div>
+                      <h3 className="text-lg font-bold text-gray-900 mb-2">Apply Directly</h3>
+                      <p className="text-gray-600 text-sm">Submit your application through the platform in just a few clicks.</p>
+                    </div>
+                    <div className="hidden lg:block absolute top-10 left-full w-12 h-8 text-blue-200 -ml-2 z-0">
+                      <svg viewBox="0 0 100 40" className="w-full h-full" fill="none" preserveAspectRatio="none">
+                        <path d="M0,20 C30,20 70,-10 100,20" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeDasharray="6 6" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  {/* Step 4 */}
+                  <div className="relative">
+                    <div className="bg-[#003399] p-6 rounded-2xl shadow-lg border border-blue-900 h-full relative z-10 text-white transform scale-105">
+                      <div className="w-12 h-12 bg-white text-[#003399] rounded-xl flex items-center justify-center font-bold text-xl mb-4">4</div>
+                      <h3 className="text-lg font-bold text-white mb-2">Start Your Journey</h3>
+                      <p className="text-blue-100 text-sm">Get accepted and prepare for your European adventure.</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                  {/* Step 1 */}
+                  <div className="relative">
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-blue-50 h-full relative z-10">
+                      <div className="w-12 h-12 bg-yellow-100 text-yellow-700 rounded-xl flex items-center justify-center font-bold text-xl mb-4">1</div>
+                      <h3 className="text-lg font-bold text-gray-900 mb-2">Create Your Account</h3>
+                      <p className="text-gray-600 text-sm">Sign up and apply for your Verified Badge to build trust with young participants.</p>
+                    </div>
+                    <div className="hidden lg:block absolute top-10 left-full w-12 h-8 text-yellow-300 -ml-2 z-0">
+                      <svg viewBox="0 0 100 40" className="w-full h-full" fill="none" preserveAspectRatio="none">
+                        <path d="M0,20 C30,20 70,-10 100,20" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeDasharray="6 6" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  {/* Step 2 */}
+                  <div className="relative">
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-blue-50 h-full relative z-10">
+                      <div className="w-12 h-12 bg-yellow-100 text-yellow-700 rounded-xl flex items-center justify-center font-bold text-xl mb-4">2</div>
+                      <h3 className="text-lg font-bold text-gray-900 mb-2">Post Your Projects</h3>
+                      <p className="text-gray-600 text-sm">Upload your opportunities with full info packs so applicants know exactly what to expect.</p>
+                    </div>
+                    <div className="hidden lg:block absolute top-10 left-full w-12 h-8 text-yellow-300 -ml-2 z-0">
+                      <svg viewBox="0 0 100 40" className="w-full h-full" fill="none" preserveAspectRatio="none">
+                        <path d="M0,20 C30,20 70,50 100,20" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeDasharray="6 6" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  {/* Step 3 */}
+                  <div className="relative">
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-blue-50 h-full relative z-10">
+                      <div className="w-12 h-12 bg-yellow-100 text-yellow-700 rounded-xl flex items-center justify-center font-bold text-xl mb-4">3</div>
+                      <h3 className="text-lg font-bold text-gray-900 mb-2">Review & Accept</h3>
+                      <p className="text-gray-600 text-sm">Browse applications and select the participants who fit your project.</p>
+                    </div>
+                    <div className="hidden lg:block absolute top-10 left-full w-12 h-8 text-yellow-300 -ml-2 z-0">
+                      <svg viewBox="0 0 100 40" className="w-full h-full" fill="none" preserveAspectRatio="none">
+                        <path d="M0,20 C30,20 70,-10 100,20" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeDasharray="6 6" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  {/* Step 4 */}
+                  <div className="relative">
+                    <div className="bg-yellow-500 p-6 rounded-2xl shadow-lg border border-yellow-600 h-full relative z-10 text-white transform scale-105">
+                      <div className="w-12 h-12 bg-white text-yellow-700 rounded-xl flex items-center justify-center font-bold text-xl mb-4">4</div>
+                      <h3 className="text-lg font-bold text-white mb-2">Connect & Collaborate</h3>
+                      <p className="text-yellow-50 text-sm">Find partner organisations to co-create new projects and expand your reach.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+
+
+        {/* SECTION 4: CTA - Recovered "Ready to Connect?" Section */}
+        <ScatteredSection
+          reverse
+          images={[
+            "car_luggage.png",
+            "Cool Kids - On Wheels.png",
+            "nomad_passport.png",
+            "red_plane.png"
+          ]}
+        >
+          <div className="text-center md:text-left">
+            <h2 className="text-5xl md:text-6xl font-black text-[#003399] mb-6 tracking-tight">
+              Ready to Connect?
             </h2>
-            <p 
-              className="text-xl text-elegant-green-dark max-w-2xl mx-auto font-light"
-              style={{ fontFamily: 'var(--font-inter-tight)' }}
-            >
-              Building connections across Europe, one event at a time
+            <p className="text-xl mb-12 max-w-2xl font-medium text-gray-600">
+              Join the Erasmus+ Connect community and start building meaningful connections across Europe.
             </p>
-          </motion.div>
-
-          {/* Stats Grid */}
-          <motion.div
-            className="grid grid-cols-2 md:grid-cols-4 gap-8"
-            initial={{ opacity: 0, y: 50 }}
-            animate={whyChooseInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ delay: 0.4 }}
-          >
-            {[
-              { icon: Calendar, label: 'Upcoming Events', value: stats.upcomingEvents, color: 'elegant-green-dark' },
-              { icon: Users, label: 'Active Participants', value: stats.totalParticipants, color: 'elegant-navy-medium' },
-              { icon: Award, label: 'Verified Organizations', value: stats.totalOrganizations, color: 'elegant-brown-medium' },
-              { icon: CheckCircle, label: 'Accepted Applications', value: stats.acceptedApplications, color: 'elegant-green-medium' },
-            ].map((stat, index) => (
-              <motion.div
-                key={index}
-                className="text-center p-6 rounded-xl bg-[#0B1D3A] shadow-lg"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={whyChooseInView ? { opacity: 1, scale: 1 } : {}}
-                transition={{ delay: 0.6 + index * 0.1 }}
-                whileHover={{ scale: 1.05, y: -5 }}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
+              <Link
+                href="/auth"
+                className="inline-flex items-center justify-center gap-3 bg-yellow-500 text-white px-8 py-4 rounded-lg font-bold text-lg hover:bg-yellow-600 transition-all shadow-xl hover:shadow-2xl hover:scale-105"
               >
-                <div className="bg-white/20 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <stat.icon className="h-8 w-8 text-white" />
-                </div>
-                <div 
-                  className="text-4xl font-black text-white mb-2" 
-                  style={{ fontFamily: 'var(--font-inter-tight)' }}
-                >
-                  {loading ? '...' : stat.value.toLocaleString()}
-                </div>
-                <div 
-                  className="text-white font-medium"
-                  style={{ fontFamily: 'var(--font-inter-tight)' }}
-                >
-                  {stat.label}
-                </div>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </motion.section>
-
-      {/* Final CTA Section */}
-      <motion.section
-        className="relative py-32 overflow-hidden"
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true, amount: 0.3 }}
-        transition={{ duration: 0.8 }}
-      >
-        {/* Background Image */}
-        <div 
-          className="absolute inset-0"
-          style={{
-            backgroundImage: 'url(https://i.pinimg.com/1200x/34/ef/db/34efdbfee7989d49803ef1d5bc1adc3f.jpg)',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-          }}
-        />
-        
-        {/* Overlay - More Opaque for Better Text Readability */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0B1D3A]/75 via-[#0B1D3A]/70 to-[#0B1D3A]/75" />
-        
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
-          <motion.h2
-            className="text-5xl md:text-6xl font-black mb-6 tracking-tight"
-            style={{
-              backgroundImage: 'linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.85) 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-              fontFamily: 'var(--font-inter-tight)',
-              textShadow: '0 2px 8px rgba(255, 255, 255, 0.3)',
-            }}
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.2 }}
-          >
-            Ready to Connect?
-          </motion.h2>
-          <motion.p
-            className="text-xl mb-12 max-w-2xl mx-auto font-medium"
-            style={{
-              backgroundImage: 'linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.8) 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-              textShadow: '0 2px 6px rgba(255, 255, 255, 0.2)',
-            }}
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.3 }}
-          >
-            Join the Erasmus+ Connect community and start building meaningful connections across Europe.
-          </motion.p>
-          <motion.div
-            className="flex flex-col sm:flex-row gap-4 justify-center"
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.4 }}
-          >
-            <Link
-              href="/auth"
-              className="group inline-flex items-center justify-center gap-3 bg-[#0B1D3A] text-white px-8 py-4 rounded-lg font-bold text-lg hover:bg-[#102949] transition-all duration-300 shadow-2xl hover:shadow-3xl hover:scale-105 border-2 border-white/20"
-              style={{
-                boxShadow: '0 8px 24px rgba(11, 29, 58, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-              }}
-            >
-              Join Now
-              <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
-            </Link>
-            <Link
-              href="/events"
-              className="inline-flex items-center justify-center gap-3 bg-[#D4AF37] text-[#0B1D3A] px-8 py-4 rounded-lg font-bold text-lg hover:bg-[#F4D03F] transition-all duration-300 shadow-2xl hover:shadow-3xl hover:scale-105 border-2 border-white/30"
-              style={{
-                boxShadow: '0 8px 24px rgba(212, 175, 55, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
-              }}
-            >
-              Browse Events
-            </Link>
-          </motion.div>
-        </div>
-      </motion.section>
+                Join Now
+                <ArrowRight className="h-5 w-5" />
+              </Link>
+            </div>
+          </div>
+        </ScatteredSection>
+      </div>
     </div>
-  )
+
+  );
 }

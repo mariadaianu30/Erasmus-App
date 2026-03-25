@@ -1,0 +1,117 @@
+.logoWrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+.logoIcon {
+    width: 130px;
+    height: 130px;
+    filter: drop-shadow(0 8px 20px rgba(0, 51, 153, 0.25));
+    animation: floatBounce 3s ease-in-out infinite;
+}
+
+.globeLines {
+    animation: spinSlow 9s linear infinite;
+    transform-origin: 70px 68px;
+}
+
+.arrowGroup {
+    animation: arrowPop 1.6s ease-in-out infinite;
+    transform-origin: 70px 68px;
+}
+
+.star1 { animation: starPop 2.2s ease-in-out infinite 0s; }
+.star2 { animation: starPop 2.2s ease-in-out infinite 0.37s; }
+.star3 { animation: starPop 2.2s ease-in-out infinite 0.74s; }
+.star4 { animation: starPop 2.2s ease-in-out infinite 1.1s; }
+.star5 { animation: starPop 2.2s ease-in-out infinite 1.47s; }
+.star6 { animation: starPop 2.2s ease-in-out infinite 1.84s; }
+
+.b1 { animation: bub1 2.9s ease-in-out infinite; }
+.b2 { animation: bub2 3.4s ease-in-out infinite 0.6s; }
+.b3 { animation: bub3 2.6s ease-in-out infinite 1.1s; }
+
+.logoText {
+    display: flex;
+    align-items: baseline;
+    gap: 2px;
+}
+
+.tMain {
+    font-size: 26px;
+    font-weight: 900;
+    color: #003399;
+    letter-spacing: -0.5px;
+}
+
+.tPlus {
+    font-size: 32px;
+    font-weight: 900;
+    color: #FFCC00;
+    display: inline-block;
+    animation: plusPop 1.9s ease-in-out infinite;
+}
+
+.tSub {
+    font-size: 10px;
+    font-weight: 700;
+    color: #003399;
+    opacity: 0.55;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-left: 3px;
+    align-self: flex-end;
+    margin-bottom: 3px;
+}
+
+.tagline {
+    font-size: 11.5px;
+    color: #003399;
+    opacity: 0.45;
+    letter-spacing: 1px;
+    font-weight: 600;
+}
+
+@keyframes floatBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-9px); }
+}
+
+@keyframes spinSlow {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes arrowPop {
+    0%, 100% { transform: scale(1); }
+    40% { transform: scale(1.18) translateY(-2px); }
+    65% { transform: scale(0.93) translateY(1px); }
+}
+
+@keyframes starPop {
+    0%, 100% { transform: scale(1) rotate(0); opacity: 1; }
+    50% { transform: scale(1.5) rotate(25deg); opacity: 0.6; }
+}
+
+@keyframes bub1 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(-4px, -9px) scale(1.08); }
+}
+
+@keyframes bub2 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(5px, -11px) scale(1.1); }
+}
+
+@keyframes bub3 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(-2px, -7px) scale(1.06); }
+}
+
+@keyframes plusPop {
+    0%, 100% { transform: scale(1) rotate(0); }
+    30% { transform: scale(1.28) rotate(-10deg); }
+    60% { transform: scale(0.88) rotate(5deg); }
+}

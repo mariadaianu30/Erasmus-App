@@ -8,65 +8,55 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        primary: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
+        background: '#FFFFFF',
+        foreground: '#0A0A0A',
+        accent: {
+          DEFAULT: '#0066FF', // Vibrant Blue
+          hover: '#0052CC',
+          light: '#4A90E2',
         },
-        secondary: {
-          50: '#f8fafc',
-          100: '#f1f5f9',
-          200: '#e2e8f0',
-          300: '#cbd5e1',
-          400: '#94a3b8',
-          500: '#64748b',
-          600: '#475569',
-          700: '#334155',
-          800: '#1e293b',
-          900: '#0f172a',
-        },
-        pastel: {
-          green: {
-            light: '#CFE8D9',
-            medium: '#A7DCC3',
-          },
+        decorative: {
           blue: {
-            light: '#B7D8F5',
-            medium: '#A3C8E9',
-          },
-          beige: {
-            light: '#F3E8D8',
-            medium: '#E9DCC3',
-          },
+            DEFAULT: '#0066FF',
+            dark: '#0047b3',
+            light: '#66a3ff',
+          }
         },
         elegant: {
           navy: {
             dark: '#0B1D3A',
             medium: '#102949',
           },
-          green: {
+          green: { // Keeping strictly for compatibility if needed, but primary is blue
             dark: '#0F3D3E',
             medium: '#145454',
           },
           brown: {
             light: '#C7B199',
             medium: '#A6937A',
-          },
-          gray: {
-            blue: '#E8EDF2',
-            soft: '#F5F7FA',
-          },
-        },
+          }
+        }
       },
       fontFamily: {
-        sans: ['var(--font-inter-tight)', 'Inter Tight', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-inter)', 'sans-serif'],
+      },
+      animation: {
+        'float': 'float 4s ease-in-out infinite',
+        'bus-drive': 'bus-drive 10s cubic-bezier(0.4, 0.0, 0.2, 1) forwards',
+      },
+      keyframes: {
+        float: {
+          '0%, 100%': { transform: 'translateY(0px) rotate(0deg)' },
+          '25%': { transform: 'translateY(-12px) rotate(-1.5deg)' },
+          '50%': { transform: 'translateY(-8px) rotate(0deg)' },
+          '75%': { transform: 'translateY(-15px) rotate(1.5deg)' },
+        },
+        'bus-drive': {
+          '0%': { transform: 'translateX(120vw)', opacity: '1' },
+          '15%': { opacity: '1' },
+          '85%': { opacity: '1' },
+          '100%': { transform: 'translateX(-120vw)', opacity: '0' },
+        }
       },
     },
   },
