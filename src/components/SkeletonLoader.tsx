@@ -13,21 +13,25 @@ export function SkeletonLoader({ className = '' }: { className?: string }) {
 
 export function EventCardSkeleton() {
   return (
-    <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden flex flex-col hover:shadow-lg transition-shadow duration-200">
-      <SkeletonLoader className="h-48 w-full" />
-      <div className="p-6 flex flex-col flex-1">
-        <div className="flex items-start justify-between mb-3">
-          <SkeletonLoader className="h-6 w-3/4 rounded" />
-          <SkeletonLoader className="h-5 w-20 rounded-full" />
+    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden flex flex-col group h-full">
+      <SkeletonLoader className="h-56 w-full" />
+      <div className="p-6 md:p-8 flex flex-col flex-1">
+        <SkeletonLoader className="h-8 w-3/4 mb-4 rounded-lg" />
+        <div className="space-y-2 mb-6">
+          <SkeletonLoader className="h-4 w-full rounded" />
+          <SkeletonLoader className="h-4 w-5/6 rounded" />
         </div>
-        <SkeletonLoader className="h-4 w-full mb-2 rounded" />
-        <SkeletonLoader className="h-4 w-5/6 mb-4 rounded" />
-        <div className="space-y-2 mb-4">
+        <div className="space-y-3 mb-6 bg-gray-50 p-4 rounded-2xl border border-gray-100">
           <SkeletonLoader className="h-4 w-2/3 rounded" />
           <SkeletonLoader className="h-4 w-1/2 rounded" />
           <SkeletonLoader className="h-4 w-3/4 rounded" />
+          <SkeletonLoader className="h-4 w-1/3 rounded" />
         </div>
-        <SkeletonLoader className="h-10 w-full rounded-lg mt-auto" />
+        <div className="flex items-center mb-6">
+          <SkeletonLoader className="h-8 w-8 rounded-full mr-3" />
+          <SkeletonLoader className="h-4 w-32 rounded" />
+        </div>
+        <SkeletonLoader className="h-12 w-full rounded-xl mt-auto" />
       </div>
     </div>
   )

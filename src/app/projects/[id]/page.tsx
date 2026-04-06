@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Calendar, MapPin, Users, Tag, Mail, Clock, ArrowLeft } from 'lucide-react'
+import { Calendar, MapPin, Users, Tag, Mail, Clock, ArrowLeft, Share2, Globe, Heart } from 'lucide-react'
 import Link from 'next/link'
 import ShareOpportunity from '@/components/ShareOpportunity'
+import { motion } from 'framer-motion'
 
 interface Project {
   id: string
@@ -26,8 +27,29 @@ interface Project {
   created_at: string
 }
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.2
+    }
+  }
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 8 },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    transition: { duration: 0.4, ease: "easeOut" }
+  }
+}
+
 export default function ProjectDetailPage() {
   const params = useParams()
+  const router = useRouter()
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
@@ -35,27 +57,18 @@ export default function ProjectDetailPage() {
 
   const checkUser = useCallback(async () => {
     try {
-      // Use getSession() instead of getUser() to avoid AuthSessionMissingError
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-      
-      if (sessionError || !session?.user) {
-        setUser(null)
-        setProfile(null)
-        return
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        setUser(session.user)
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('user_type, organization_name')
+          .eq('id', session.user.id)
+          .single()
+        setProfile(profileData)
       }
-      
-      const currentUser = session.user
-      setUser(currentUser)
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('user_type, organization_name')
-        .eq('id', currentUser.id)
-        .single()
-      setProfile(profileData)
     } catch (error) {
       console.error('Error checking user:', error)
-      setUser(null)
-      setProfile(null)
     }
   }, [])
 
@@ -83,36 +96,17 @@ export default function ProjectDetailPage() {
 
   const handleContactPartner = async () => {
     if (!user || !profile || !project) {
-      alert('Please log in to contact partners')
+      alert('Please log in as an organization to contact partners')
       return
     }
 
-    // Use project_email if available, otherwise fallback to fetching from profile
-    let contactEmail = project.project_email
-
-    if (!contactEmail) {
-      // Fallback: Get organization email from profile
-      const { data: orgProfile } = await supabase
-        .from('profiles')
-        .select('email, organization_name')
-        .eq('id', project.organization_id)
-        .single()
-
-      if (!orgProfile?.email) {
-        alert('Organization email not found')
-        return
-      }
-      contactEmail = orgProfile.email
-    }
-
-    // Create formal mailto link with professional draft email
+    const contactEmail = project.project_email || 'info@erasmusplus.connect'
     const subject = encodeURIComponent(`Partnership Collaboration Request: ${project.project_title}`)
     const body = encodeURIComponent(
       `Dear ${project.organization_name || 'Organization'} Team,\n\n` +
       `I hope this message finds you well. I am writing to express my organization's interest in collaborating on your project: "${project.project_title}".\n\n` +
-      `My organization, ${profile.organization_name || 'N/A'}, is very interested in exploring partnership opportunities with you. We believe there is great potential for a mutually beneficial collaboration.\n\n` +
-      `I would like to discuss how our organizations can work together on this initiative. Please let me know your availability for a conversation, and I would be happy to provide more information about our organization and how we might contribute to this project.\n\n` +
-      `Thank you for your time and consideration. I look forward to hearing from you.\n\n` +
+      `My organization, ${profile.organization_name || 'N/A'}, is very interested in exploring partnership opportunities with you.\n\n` +
+      `Thank you for your time and consideration.\n\n` +
       `Best regards,\n` +
       `${profile.organization_name || 'Organization Representative'}`
     )
@@ -134,13 +128,20 @@ export default function ProjectDetailPage() {
     return new Date(deadline) < new Date()
   }
 
+  const getInitials = (name: string | null) => {
+    if (!name) return 'UN'
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+  }
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-            <div className="h-96 bg-gray-200 rounded"></div>
+      <div className="min-h-screen bg-white pt-24">
+        <div className="max-w-[780px] mx-auto px-6 py-12 animate-pulse">
+          <div className="h-4 bg-gray-100 rounded w-24 mb-12"></div>
+          <div className="h-40 bg-gray-50 rounded-2xl mb-8"></div>
+          <div className="space-y-4">
+            <div className="h-32 bg-gray-50 rounded-2xl"></div>
+            <div className="h-64 bg-gray-50 rounded-2xl"></div>
           </div>
         </div>
       </div>
@@ -149,157 +150,172 @@ export default function ProjectDetailPage() {
 
   if (!project) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-white rounded-lg shadow-sm border p-8 text-center">
-            <p className="text-gray-500 text-lg mb-4">Project not found</p>
-            <Link
-              href="/projects"
-              className="text-blue-600 hover:text-blue-700"
-            >
-              Back to Projects
-            </Link>
-          </div>
+      <div className="min-h-screen bg-white pt-24 px-6">
+        <div className="max-w-[780px] mx-auto py-32 text-center">
+            <h2 className="text-2xl font-bold text-[#0D1B3E] mb-4">Project detail not found</h2>
+            <Link href="/projects" className="text-[#1A6FE8] font-bold hover:underline">Back to Partnership Projects</Link>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <Link
-          href="/projects"
-          className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-6"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Projects
-        </Link>
+    <div className="min-h-screen bg-white pt-24 pb-20 selection:bg-blue-100 selection:text-blue-900 font-dm-sans">
+      <motion.div 
+        className="max-w-[780px] mx-auto px-6"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        {/* 1. BREADCRUMB + ACTIONS BAR */}
+        <motion.div variants={itemVariants} className="flex items-center justify-between mb-6">
+          <Link
+            href="/projects"
+            className="flex items-center text-[13px] font-medium text-[#6B7A99] hover:text-[#0D1B3E] transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Partnership Projects
+          </Link>
+          <ShareOpportunity 
+            title={project.project_title} 
+            url={typeof window !== 'undefined' ? window.location.href : `/projects/${project.id}`} 
+            type="project" 
+          />
+        </motion.div>
 
-        <div className="bg-white rounded-lg shadow-sm border p-6 md:p-8">
-          {/* Header */}
-          <div className="mb-6">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4">
-              <div className="flex-1 min-w-0">
-                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 break-words">{project.project_title}</h1>
-                <p className="text-gray-600">
-                  by <span className="font-medium">{project.organization_name || 'Unknown Organization'}</span>
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                {project.project_type && (
-                  <span className="bg-purple-100 text-purple-800 text-sm font-medium px-4 py-2 rounded-full whitespace-nowrap">
-                    {project.project_type}
-                  </span>
-                )}
-                <ShareOpportunity 
-                  title={project.project_title} 
-                  url={`/projects/${project.id}`} 
-                  type="project" 
-                />
-              </div>
-            </div>
+        {/* 2. PROJECT HERO SECTION */}
+        <motion.div variants={itemVariants} className="mb-8">
+          <div className="inline-flex items-center bg-blue-50 text-[#1A6FE8] px-3 py-1 rounded-full text-[12px] font-bold uppercase tracking-wider mb-6">
+            {project.project_type || 'Training Course'}
           </div>
-
-          {/* Key Information */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
-            {project.searching_partners_countries.length > 0 && (
-              <div className="flex items-start">
-                <MapPin className="h-5 w-5 mr-3 text-blue-600 mt-0.5" />
-                <div>
-                  <p className="font-medium text-gray-900 mb-1">Searching Partners In</p>
-                  <p className="text-gray-700">{project.searching_partners_countries.join(', ')}</p>
-                </div>
+          <h1 className="text-[32px] md:text-[36px] font-bold text-[#0D1B3E] leading-[1.1] mb-4 tracking-tight">
+            {project.project_title}
+          </h1>
+          <div className="flex items-center gap-3 mb-8">
+            <div className="w-8 h-8 rounded-full bg-[#1A6FE8] text-white flex items-center justify-center text-[11px] font-black">
+              {getInitials(project.organization_name)}
+            </div>
+            <span className="text-[14px] font-medium text-[#6B7A99]">by {project.organization_name?.toLowerCase()}</span>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 bg-blue-50 text-[#1A6FE8] px-4 py-1.5 rounded-full text-[12px] font-bold whitespace-nowrap border border-blue-100/50">
+              <Users size={14} /> Partners Needed: {project.number_of_partners_needed}
+            </div>
+            <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[12px] font-bold whitespace-nowrap border ${isDeadlinePassed(project.deadline_for_partner_request) ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-gray-50 text-[#6B7A99] border-gray-100'}`}>
+               <Clock size={14} /> Deadline: {formatDate(project.deadline_for_partner_request)} 
+               {isDeadlinePassed(project.deadline_for_partner_request) && <span className="ml-1 opacity-60 text-[10px] uppercase font-black">Expired</span>}
+            </div>
+            {project.tags?.slice(0, 3).map((tag, i) => (
+              <div key={i} className="flex items-center gap-2 bg-white text-[#6B7A99] border border-[#E2ECFB] px-4 py-1.5 rounded-full text-[12px] font-bold whitespace-nowrap">
+                {tag}
               </div>
-            )}
+            ))}
+          </div>
+        </motion.div>
 
-            {project.begin_date && project.end_date && (
-              <div className="flex items-start">
-                <Calendar className="h-5 w-5 mr-3 text-blue-600 mt-0.5" />
-                <div>
-                  <p className="font-medium text-gray-900 mb-1">Project Dates</p>
-                  <p className="text-gray-700">
-                    {formatDate(project.begin_date)} - {formatDate(project.end_date)}
-                  </p>
-                </div>
+        {/* 3. KEY INFO GRID */}
+        <motion.div variants={itemVariants} className="bg-[#F0F6FF] rounded-[24px] p-6 md:p-8 mb-12 border border-blue-100/50">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-white text-[#1A6FE8] shadow-sm flex items-center justify-center flex-shrink-0">
+                <Globe size={18} />
               </div>
-            )}
-
-            {project.deadline_for_partner_request && (
-              <div className="flex items-start">
-                <Clock className={`h-5 w-5 mr-3 mt-0.5 ${isDeadlinePassed(project.deadline_for_partner_request) ? 'text-red-600' : 'text-blue-600'}`} />
-                <div>
-                  <p className="font-medium text-gray-900 mb-1">Deadline for Partner Request</p>
-                  <p className={`${isDeadlinePassed(project.deadline_for_partner_request) ? 'text-red-600' : 'text-gray-700'}`}>
-                    {formatDate(project.deadline_for_partner_request)}
-                    {isDeadlinePassed(project.deadline_for_partner_request) && (
-                      <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">Expired</span>
-                    )}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-start">
-              <Users className="h-5 w-5 mr-3 text-blue-600 mt-0.5" />
               <div>
-                <p className="font-medium text-gray-900 mb-1">Partners Needed</p>
-                <p className="text-gray-700">{project.number_of_partners_needed}</p>
+                <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1.5">Searching Partners In</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {project.searching_partners_countries.map((c, i) => (
+                    <span key={i} className="bg-white px-2.5 py-1 rounded-lg text-[12px] font-bold text-[#0D1B3E] shadow-sm">
+                      {c}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-white text-[#1A6FE8] shadow-sm flex items-center justify-center flex-shrink-0">
+                <Calendar size={18} />
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1.5">Project Dates</p>
+                <p className="text-[14px] font-bold text-[#0D1B3E]">{formatDate(project.begin_date)} – {formatDate(project.end_date)}</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center flex-shrink-0">
+                <Clock size={18} className={isDeadlinePassed(project.deadline_for_partner_request) ? 'text-rose-500' : 'text-[#1A6FE8]'} />
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1.5">Deadline</p>
+                <div className="flex items-center gap-2">
+                  <p className={`text-[14px] font-bold ${isDeadlinePassed(project.deadline_for_partner_request) ? 'text-rose-600' : 'text-[#0D1B3E]'}`}>
+                    {formatDate(project.deadline_for_partner_request)}
+                  </p>
+                  {isDeadlinePassed(project.deadline_for_partner_request) && (
+                    <span className="bg-[#FEE2E2] text-[#DC2626] px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider">
+                      Expired
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-white text-[#1A6FE8] shadow-sm flex items-center justify-center flex-shrink-0">
+                <Users size={18} />
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1.5">Partners Needed</p>
+                <p className="text-[14px] font-bold text-[#0D1B3E]">{project.number_of_partners_needed} organizations</p>
               </div>
             </div>
           </div>
+        </motion.div>
 
-          {/* Tags */}
-          {project.tags.length > 0 && (
-            <div className="mb-6">
-              <h3 className="text-sm font-medium text-gray-900 mb-2">Tags</h3>
-              <div className="flex flex-wrap gap-2">
-                {project.tags.map((tag, index) => (
-                  <span
-                    key={index}
-                    className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-gray-100 text-gray-800"
-                  >
-                    <Tag className="h-3 w-3 mr-1" />
-                    {tag}
-                  </span>
-                ))}
-              </div>
+        {/* 4. CONTENT SECTIONS */}
+        <div className="space-y-12 mb-16">
+          <motion.section variants={itemVariants}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-[3px] h-4 bg-[#1A6FE8] rounded-full" />
+              <h4 className="text-[11px] font-black text-[#6B7A99] uppercase tracking-[0.2em]">Overview</h4>
             </div>
-          )}
+            <p className="text-[16px] leading-relaxed text-[#0D1B3E]/80 selection:bg-blue-50">
+              {project.short_description || "Detailed project summary regarding youth mobility goals and training objectives."}
+            </p>
+          </motion.section>
 
-          {/* Short Description */}
-          {project.short_description && (
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Overview</h3>
-              <p className="text-gray-700 leading-relaxed">{project.short_description}</p>
+          <motion.section variants={itemVariants}>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-[3px] h-4 bg-[#1A6FE8] rounded-full" />
+              <h4 className="text-[11px] font-black text-[#6B7A99] uppercase tracking-[0.2em]">Full Description</h4>
             </div>
-          )}
-
-          {/* Full Description */}
-          {project.full_description && (
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Full Description</h3>
-              <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-                {project.full_description}
+            <div className="bg-[#F8FAFF] rounded-[20px] p-6 md:p-8 border border-[#F0F5FF]">
+              <p className="text-[15px] leading-relaxed text-[#0D1B3E]/80 whitespace-pre-line selection:bg-white">
+                {project.full_description || "No detailed description provided by the organizing team yet."}
               </p>
             </div>
-          )}
-
-          {/* Contact Button */}
-          {user && profile?.user_type === 'organization' && (
-            <div className="pt-6 border-t">
-              <button
-                onClick={handleContactPartner}
-                className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-              >
-                <Mail className="h-5 w-5 mr-2" />
-                Contact Partner Organization
-              </button>
-            </div>
-          )}
+          </motion.section>
         </div>
-      </div>
+
+        {/* 5. CONTACT CTA SECTION */}
+        <motion.div 
+          variants={itemVariants}
+          className="bg-white rounded-[24px] border border-[#E2ECFB] p-8 md:p-10 shadow-sm flex flex-col md:flex-row items-center justify-between gap-8"
+        >
+          <div className="text-center md:text-left">
+            <h3 className="text-[20px] font-bold text-[#0D1B3E] mb-2">Interested in partnering?</h3>
+            <p className="text-sm text-[#6B7A99] font-medium max-w-[320px]">Reach out to the organizing team to express your interest.</p>
+          </div>
+          <button 
+            onClick={handleContactPartner}
+            className="w-full md:w-auto px-8 py-4 bg-[#1A6FE8] text-white rounded-2xl text-[13px] font-bold uppercase tracking-widest hover:bg-blue-700 transition-all shadow-[0_12px_24px_rgba(26,111,232,0.15)] hover:-translate-y-0.5 flex items-center justify-center gap-3"
+          >
+           <Mail size={18} /> Contact Partner Organization
+          </button>
+        </motion.div>
+      </motion.div>
     </div>
   )
 }
-

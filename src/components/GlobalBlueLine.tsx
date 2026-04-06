@@ -1,75 +1,72 @@
 "use client";
 
-import { motion, useScroll, useSpring } from "framer-motion";
+import { motion, useScroll, useSpring, useTransform } from "framer-motion";
 import { useRef } from "react";
 
-export default function GlobalBlueLine() {
+interface GlobalBlueLineProps {
+    startSide?: 'left' | 'right';
+    initialProgress?: number;
+    variant?: 'elegant' | 'curvy';
+}
+
+export default function GlobalBlueLine({ 
+    startSide = 'right', 
+    initialProgress = 0,
+    variant = 'elegant' 
+}: GlobalBlueLineProps) {
     const containerRef = useRef<HTMLDivElement>(null);
 
     const { scrollYProgress } = useScroll();
 
-    const pathLength = useSpring(scrollYProgress, {
+    // Mapping scroll progress from initialProgress (default 0 for Home, 0.27 for Orgs/Events)
+    const baseLength = useTransform(scrollYProgress, [0, 1], [initialProgress, 1]);
+
+    const pathLength = useSpring(baseLength, {
         stiffness: 150,
         damping: 30,
         restDelta: 0.001
     });
 
+    // Redesigned Paths for two variants
+    const paths = {
+        elegant: {
+            right: "M 95 0 C 85 200, 70 400, 50 650 S 5 1500, 50 3000 S 95 4500, 50 6000 S 5 7500, 50 8500",
+            left: "M 5 0 C 15 200, 30 400, 50 650 S 95 1500, 50 3000 S 5 4500, 50 6000 S 95 7500, 50 8500",
+        },
+        curvy: {
+            right: "M 95 0 C 80 150, 40 300, 60 500 S 95 800, 40 1200 S 5 1600, 60 2100 S 95 2600, 30 3200 S 5 3800, 70 4500 S 95 5200, 20 6000 S 10 6800, 85 7600 S 35 8200, 50 8500",
+            left: "M 5 0 C 20 150, 60 300, 40 500 S 5 800, 60 1200 S 95 1600, 40 2100 S 5 2600, 70 3200 S 95 3800, 30 4500 S 5 5200, 80 6000 S 90 6800, 15 7600 S 65 8200, 50 8500",
+        }
+    };
+
+    const activeD = paths[variant][startSide];
+
     return (
-        <div ref={containerRef} className="absolute inset-x-0 top-0 h-full w-full pointer-events-none overflow-hidden" style={{ zIndex: 9 }}>
-            {/* 
-         The SVG uses pathLength to animate the drawing of the line matching scroll progress.
-         PreserveAspectRatio none stretches it to fit the long page.
-      */}
+        <div ref={containerRef} className="absolute inset-x-0 top-0 h-full w-full pointer-events-none overflow-hidden" style={{ zIndex: 5 }}>
             <svg
                 className="w-full h-full"
                 preserveAspectRatio="none"
                 viewBox="0 0 100 8500"
             >
                 <motion.path
-                    d="M 20 0 
-             C 60 100, 80 200, 50 350
-             S 20 600, 60 800
-             S 80 1050, 40 1300
-             S 10 1600, 90 1800
-             C 140 2000, 130 2100, 80 2150 
-             S -40 2500, 20 2800
-             S 80 3200, 40 3600
-             S 20 3800, 60 4000
-             S 100 4500, 50 5000
-             S 0 5500, 50 6000
-             S 100 6500, 20 7000
-             S 60 7250, 40 7500
-             S 20 8000, 60 8500"
+                    d={activeD}
                     fill="none"
                     stroke="#003399"
-                    strokeWidth="4"
+                    strokeWidth="3.5"
                     strokeLinecap="round"
                     className="drop-shadow-xl opacity-80"
-                    initial={{ pathLength: 0 }}
+                    initial={{ pathLength: initialProgress }}
                     style={{ pathLength }}
                 />
 
                 <motion.path
-                    d="M 20 0 
-             C 60 100, 80 200, 50 350
-             S 20 600, 60 800
-             S 80 1050, 40 1300
-             S 10 1600, 90 1800
-             C 140 2000, 130 2100, 80 2150 
-             S -40 2500, 20 2800
-             S 80 3200, 40 3600
-             S 20 3800, 60 4000
-             S 100 4500, 50 5000
-             S 0 5500, 50 6000
-             S 100 6500, 20 7000
-             S 60 7250, 40 7500
-             S 20 8000, 60 8500"
+                    d={activeD}
                     fill="none"
                     stroke="#60A5FA"
-                    strokeWidth="1.5"
+                    strokeWidth="1"
                     strokeLinecap="round"
                     className="opacity-50"
-                    initial={{ pathLength: 0 }}
+                    initial={{ pathLength: initialProgress }}
                     style={{ pathLength }}
                 />
             </svg>

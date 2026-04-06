@@ -1,13 +1,12 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useScroll, useTransform, useMotionTemplate } from "framer-motion";
 import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight } from "lucide-react";
 import GlobalBlueLine from "@/components/GlobalBlueLine";
 import ScatteredSection from "@/components/ScatteredSection";
-import IntroSplash from "@/components/IntroSplash";
 import { supabase } from "@/lib/supabase";
 
 export default function Home() {
@@ -23,6 +22,18 @@ export default function Home() {
     countries: 0
   });
   const [activeTab, setActiveTab] = useState<'young-people' | 'organizations'>('young-people');
+
+  const trustSectionRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress: trustScrollY } = useScroll({
+    target: trustSectionRef,
+    offset: ["start 70%", "center center"] // Triggers vividly as it reaches the center
+  });
+  
+  const trustBgSize = useTransform(trustScrollY, [0, 1], ["0%", "150%"]);
+  // the stain effect center
+  const trustBackground = useMotionTemplate`radial-gradient(ellipse at 50% 10%, #1e3a8a 0%, #1e3a8a ${trustBgSize}, transparent calc(${trustBgSize} + 10%))`;
+  const trustTextColor = useTransform(trustScrollY, [0.3, 0.7], ["#003399", "#ffffff"]);
+
 
   // Helper for slug (same as in organizations/page.tsx)
   const slugifyOrganizationName = (name: string) =>
@@ -154,7 +165,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden relative">
-      <IntroSplash />
+      
       {/* NEW HERO SECTION */}
       <section className="h-screen w-full bg-[#003399] flex flex-col items-center justify-start pt-32 text-white relative z-10 overflow-hidden">
         <motion.div
@@ -190,7 +201,7 @@ export default function Home() {
 
       {/* CONTENT STARTING BELOW HERO */}
       <div className="relative">
-        <GlobalBlueLine />
+        <GlobalBlueLine variant="curvy" />
 
         {/* SECTION 1.5: WHO WE ARE */}
         <div className="relative z-20 py-24 w-full flex justify-center items-center">
@@ -231,97 +242,9 @@ export default function Home() {
           </div>
         </div>
 
-        {/* SECTION 1.8: MEET US */}
-        <div className="relative z-20 pb-24 w-full">
-          <div className="max-w-7xl mx-auto px-4 transform scale-95 origin-top">
-            <div className="flex justify-center mb-16">
-              <div className="relative py-4 px-12 md:px-24 w-full max-w-lg flex justify-center items-center">
-                {/* Background Box */}
-                <div className="absolute inset-0 bg-white rounded-full shadow-lg border border-blue-100/50" />
-
-                {/* Text */}
-                <h2 className="relative z-10 text-4xl md:text-5xl font-black text-[#003399] text-center tracking-tight">
-                  MEET US
-                </h2>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
-              {/* Card 1: Andrei */}
-              <div className="bg-white rounded-3xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-blue-50 flex flex-col items-center text-center">
-                <div className="aspect-square relative mb-6 rounded-2xl overflow-hidden shadow-md w-full">
-                  <Image
-                    src="/images/andrei.jpeg"
-                    alt="Andrei Cristea"
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-                <h3 className="text-2xl font-bold text-[#003399] mb-2">Andrei Cristea</h3>
-                <p className="text-blue-600 font-medium tracking-wide uppercase text-sm mb-4">Technical Lead & Backend Developer</p>
-                <div className="w-12 h-1 bg-blue-100 rounded-full mb-6"></div>
-                <a
-                  href="https://www.linkedin.com/in/andrei1cristea/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block px-6 py-2 bg-[#003399]/80 text-white font-bold rounded-full hover:bg-[#003399] transition-all text-sm uppercase tracking-wider shadow-lg hover:shadow-xl transform hover:scale-105"
-                >
-                  More about me
-                </a>
-              </div>
-
-              {/* Card 2: Ciprian */}
-              <div className="bg-white rounded-3xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-blue-50 flex flex-col items-center text-center">
-                <div className="aspect-square relative mb-6 rounded-2xl overflow-hidden shadow-md w-full">
-                  <Image
-                    src="/images/ciprian.jpg"
-                    alt="Ciprian Sfîrlogea"
-                    fill
-                    className="object-cover object-top"
-                  />
-                </div>
-                <h3 className="text-2xl font-bold text-[#003399] mb-2">Ciprian Sfîrlogea</h3>
-                <p className="text-blue-600 font-medium tracking-wide uppercase text-sm mb-4">Scout Society Founder</p>
-                <div className="w-12 h-1 bg-blue-100 rounded-full mb-6"></div>
-                <a
-                  href="https://www.linkedin.com/in/ciprian-sfirlogea-45688310/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block px-6 py-2 bg-[#003399]/80 text-white font-bold rounded-full hover:bg-[#003399] transition-all text-sm uppercase tracking-wider shadow-lg hover:shadow-xl transform hover:scale-105"
-                >
-                  More about me
-                </a>
-              </div>
-
-              {/* Card 3: Maria */}
-              <div className="bg-white rounded-3xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-blue-50 flex flex-col items-center text-center">
-                <div className="aspect-square relative mb-6 rounded-2xl overflow-hidden shadow-md w-full">
-                  <Image
-                    src="/images/maria.jpeg"
-                    alt="Maria Dăianu"
-                    fill
-                    className="object-cover object-[50%_25%]"
-                  />
-                </div>
-                <h3 className="text-2xl font-bold text-[#003399] mb-2">Maria Dăianu</h3>
-                <p className="text-blue-600 font-medium tracking-wide uppercase text-sm mb-4">Marketing Lead & Frontend Developer</p>
-                <div className="w-12 h-1 bg-blue-100 rounded-full mb-6"></div>
-                <a
-                  href="https://www.linkedin.com/in/maria-daianu-150640331/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block px-6 py-2 bg-[#003399]/80 text-white font-bold rounded-full hover:bg-[#003399] transition-all text-sm uppercase tracking-wider shadow-lg hover:shadow-xl transform hover:scale-105"
-                >
-                  More about me
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* SECTION 1.9: FOR YOUNG PEOPLE */}
         <div className="relative z-20 py-24 w-full">
-          <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center gap-12 md:gap-24 transform scale-95 origin-top">
+          <div className="max-w-[100rem] mx-auto px-4 lg:px-12 flex flex-col md:flex-row items-center gap-12 md:gap-24 transform scale-95 origin-top">
             {/* Left Column: Text */}
             <div className="flex-1 text-left relative z-10 md:pl-8 lg:pl-16">
               <div className="bg-white/90 backdrop-blur-sm rounded-3xl p-6 md:p-10 shadow-sm border border-blue-50/50">
@@ -343,16 +266,26 @@ export default function Home() {
             {/* Right Column: Images */}
             <div className="flex-1 relative w-full min-h-[400px] flex justify-center items-center md:pr-8 lg:pr-16">
               {/* Main Image (Center) */}
-              <Image
-                src="/images/Cool Kids - On Wheels.png"
-                alt="Young People on Wheels"
-                width={300}
-                height={300}
-                className="relative z-20 w-48 md:w-64 h-auto drop-shadow-2xl object-contain animate-float-slow"
-              />
+              <motion.div
+                animate={{ x: [0, 15, 0], y: [0, -5, 0] }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                className="relative z-20"
+              >
+                <Image
+                  src="/images/Cool Kids - On Wheels.png"
+                  alt="Young People on Wheels"
+                  width={300}
+                  height={300}
+                  className="w-48 md:w-64 h-auto drop-shadow-2xl object-contain"
+                />
+              </motion.div>
 
               {/* Boy Skate (Top Right) */}
-              <div className="absolute top-0 right-4 md:right-12 z-10 animate-float-delayed">
+              <motion.div 
+                animate={{ x: [0, -20, 0], y: [0, -5, 0] }}
+                transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+                className="absolute top-0 right-4 md:right-12 z-10"
+              >
                 <Image
                   src="/images/boy_skate.png"
                   alt="Skater"
@@ -360,7 +293,7 @@ export default function Home() {
                   height={200}
                   className="w-32 md:w-40 h-auto drop-shadow-xl object-contain rotate-12"
                 />
-              </div>
+              </motion.div>
 
               {/* Nomad Map (Bottom Left) */}
               <div className="absolute bottom-4 left-4 md:left-12 z-0 animate-float-slower">
@@ -378,7 +311,7 @@ export default function Home() {
 
         {/* SECTION 1.10: FOR ORGANISATIONS */}
         <div className="relative z-20 py-24 w-full">
-          <div className="max-w-7xl mx-auto px-4 flex flex-col-reverse md:flex-row items-center gap-12 md:gap-24 transform scale-95 origin-top">
+          <div className="max-w-[100rem] mx-auto px-4 lg:px-12 flex flex-col-reverse md:flex-row items-center gap-12 md:gap-24 transform scale-95 origin-top">
             {/* Left Column: Images */}
             <div className="flex-1 relative w-full min-h-[400px] flex justify-center items-center md:pl-8 lg:pl-16">
               {/* Main Image */}
@@ -577,70 +510,168 @@ export default function Home() {
           </div>
         </div>
 
-        {/* SECTION 1.35: TRUST INDICATORS */}
-        <div className="relative z-20 py-24 bg-blue-900 w-full text-white overflow-hidden">
-          {/* Background decoration */}
-          <div className="absolute top-0 left-0 w-full h-full overflow-hidden opacity-10">
-            <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-blue-400 blur-3xl"></div>
-            <div className="absolute top-1/2 right-0 w-64 h-64 rounded-full bg-blue-300 blur-3xl"></div>
-          </div>
-
-          <div className="max-w-7xl mx-auto px-4 relative z-10 transform scale-95 origin-top">
-            <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-5xl font-black mb-6 tracking-tight">
-                Built on Trust & Transparency
-              </h2>
-              <p className="text-blue-100 text-lg max-w-2xl mx-auto font-light">
-                We prioritize safety and quality. Our platform connects you only with verified partners and official Erasmus+ opportunities.
-              </p>
+                {/* SECTION 1.8: MEET US */}
+        <div className="relative z-20 pb-24 w-full">
+          <div className="max-w-7xl mx-auto px-4 transform scale-95 origin-top">
+            <div className="flex justify-center mb-16">
+              <div className="relative py-4 w-full flex justify-center items-center">
+                <h2 className="relative z-10 text-4xl md:text-5xl font-black text-[#003399] text-center tracking-tight uppercase">
+                  MEET THE TEAM
+                </h2>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-16">
-              {/* Stat 1 */}
-              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 text-center hover:bg-white/20 transition-all">
-                <div className="text-5xl font-black text-blue-200 mb-2">
-                  {trustStats.verifiedOrgs}+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
+              {/* Card 1: Andrei */}
+              <div className="bg-white rounded-3xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-blue-50 flex flex-col items-center text-center">
+                <div className="aspect-square relative mb-6 rounded-2xl overflow-hidden shadow-md w-full">
+                  <Image
+                    src="/images/andrei.jpeg"
+                    alt="Andrei Cristea"
+                    fill
+                    className="object-cover"
+                  />
                 </div>
-                <div className="text-blue-100 font-medium">Verified Organizations</div>
+                <h3 className="text-2xl font-bold text-[#003399] mb-2">Andrei Cristea</h3>
+                <p className="text-blue-600 font-medium tracking-wide uppercase text-sm mb-4">Technical Lead & Backend Developer</p>
+                <div className="w-12 h-1 bg-blue-100 rounded-full mb-6"></div>
+                <a
+                  href="https://www.linkedin.com/in/andrei1cristea/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block px-6 py-2 bg-[#003399]/80 text-white font-bold rounded-full hover:bg-[#003399] transition-all text-sm uppercase tracking-wider shadow-lg hover:shadow-xl transform hover:scale-105"
+                >
+                  More about me
+                </a>
               </div>
 
-              {/* Stat 2 */}
-              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 text-center hover:bg-white/20 transition-all">
-                <div className="text-5xl font-black text-blue-200 mb-2">
-                  {trustStats.youthHelped}+
+              {/* Card 2: Ciprian */}
+              <div className="bg-white rounded-3xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-blue-50 flex flex-col items-center text-center">
+                <div className="aspect-square relative mb-6 rounded-2xl overflow-hidden shadow-md w-full">
+                  <Image
+                    src="/images/ciprian.jpg"
+                    alt="Ciprian Sfîrlogea"
+                    fill
+                    className="object-cover object-top"
+                  />
                 </div>
-                <div className="text-blue-100 font-medium">Young People Helped</div>
+                <h3 className="text-2xl font-bold text-[#003399] mb-2">Ciprian Sfîrlogea</h3>
+                <p className="text-blue-600 font-medium tracking-wide uppercase text-sm mb-4">Scout Society Founder</p>
+                <div className="w-12 h-1 bg-blue-100 rounded-full mb-6"></div>
+                <a
+                  href="https://www.linkedin.com/in/ciprian-sfirlogea-45688310/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block px-6 py-2 bg-[#003399]/80 text-white font-bold rounded-full hover:bg-[#003399] transition-all text-sm uppercase tracking-wider shadow-lg hover:shadow-xl transform hover:scale-105"
+                >
+                  More about me
+                </a>
               </div>
 
-              {/* Stat 3 */}
-              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 text-center hover:bg-white/20 transition-all">
-                <div className="text-5xl font-black text-blue-200 mb-2">
-                  {trustStats.countries}
+              {/* Card 3: Maria */}
+              <div className="bg-white rounded-3xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-blue-50 flex flex-col items-center text-center">
+                <div className="aspect-square relative mb-6 rounded-2xl overflow-hidden shadow-md w-full">
+                  <Image
+                    src="/images/maria.jpeg"
+                    alt="Maria Dăianu"
+                    fill
+                    className="object-cover object-[50%_25%]"
+                  />
                 </div>
-                <div className="text-blue-100 font-medium">Countries Covered</div>
-              </div>
-
-              {/* Stat 4 - Badges / Safety */}
-              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 text-center hover:bg-white/20 transition-all flex flex-col justify-center items-center">
-                <div className="flex -space-x-4 mb-3 justify-center">
-                  <div className="w-12 h-12 rounded-full bg-green-500 border-2 border-blue-900 flex items-center justify-center text-white" title="Verified Partner">
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                  </div>
-                  <div className="w-12 h-12 rounded-full bg-blue-500 border-2 border-blue-900 flex items-center justify-center text-white" title="Erasmus+ Accredited">
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
-                  </div>
-                  <div className="w-12 h-12 rounded-full bg-yellow-500 border-2 border-blue-900 flex items-center justify-center text-white" title="High Safety Standards">
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-                  </div>
-                </div>
-                <div className="text-blue-100 font-medium">Safety & Quality Badges</div>
+                <h3 className="text-2xl font-bold text-[#003399] mb-2">Maria Dăianu</h3>
+                <p className="text-blue-600 font-medium tracking-wide uppercase text-sm mb-4">Marketing Lead & Frontend Developer</p>
+                <div className="w-12 h-1 bg-blue-100 rounded-full mb-6"></div>
+                <a
+                  href="https://www.linkedin.com/in/maria-daianu-150640331/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block px-6 py-2 bg-[#003399]/80 text-white font-bold rounded-full hover:bg-[#003399] transition-all text-sm uppercase tracking-wider shadow-lg hover:shadow-xl transform hover:scale-105"
+                >
+                  More about me
+                </a>
               </div>
             </div>
           </div>
         </div>
 
+        {/* SECTION 1.35: TRUST INDICATORS */}
+        <motion.div 
+          ref={trustSectionRef}
+          style={{ color: trustTextColor }}
+          className="relative z-20 w-full overflow-hidden bg-white"
+        >
+          {/* Expanding Radial Background Paint */}
+          <motion.div 
+            style={{ backgroundImage: trustBackground }}
+            className="absolute top-0 left-0 w-full h-full z-0 pointer-events-none"
+          />
 
-        {/* SECTION 1.40: HOW IT WORKS */}
+          <div className="relative z-10 py-24">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 0.1 }}
+              transition={{ duration: 0.8 }}
+              className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none"
+            >
+              <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-blue-400 blur-3xl"></div>
+              <div className="absolute top-1/2 right-0 w-64 h-64 rounded-full bg-blue-300 blur-3xl"></div>
+            </motion.div>
+
+            <div className="max-w-[100rem] lg:px-12 mx-auto px-4 relative z-10 transform scale-95 origin-top">
+              <div className="text-center mb-16">
+                <h2 className="text-3xl md:text-5xl font-black mb-6 tracking-tight text-inherit">
+                  Built on Trust & Transparency
+                </h2>
+                <p className="opacity-80 text-lg max-w-2xl mx-auto font-light text-inherit">
+                  We prioritize safety and quality. Our platform connects you only with verified partners and official Erasmus+ opportunities.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-16">
+                {/* Stat 1 */}
+                <div className="backdrop-blur-md rounded-2xl p-6 border text-center opacity-90 transition-all border-current">
+                  <div className="text-5xl font-black opacity-100 mb-2 text-inherit">
+                    {trustStats.verifiedOrgs}+
+                  </div>
+                  <div className="opacity-80 font-medium text-inherit">Verified Organizations</div>
+                </div>
+
+                {/* Stat 2 */}
+                <div className="backdrop-blur-md rounded-2xl p-6 border text-center opacity-90 transition-all border-current">
+                  <div className="text-5xl font-black opacity-100 mb-2 text-inherit">
+                    {trustStats.youthHelped}+
+                  </div>
+                  <div className="opacity-80 font-medium text-inherit">Young People Helped</div>
+                </div>
+
+                {/* Stat 3 */}
+                <div className="backdrop-blur-md rounded-2xl p-6 border text-center opacity-90 transition-all border-current">
+                  <div className="text-5xl font-black opacity-100 mb-2 text-inherit">
+                    {trustStats.countries}
+                  </div>
+                  <div className="opacity-80 font-medium text-inherit">Countries Covered</div>
+                </div>
+
+                {/* Stat 4 - Badges / Safety */}
+                <div className="backdrop-blur-md rounded-2xl p-6 border text-center opacity-90 transition-all border-current flex flex-col justify-center items-center">
+                  <div className="flex -space-x-4 mb-3 justify-center text-white">
+                    <div className="w-12 h-12 rounded-full bg-green-500 border-2 border-current flex items-center justify-center pointer-events-none" title="Verified Partner">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </div>
+                    <div className="w-12 h-12 rounded-full bg-blue-500 border-2 border-current flex items-center justify-center pointer-events-none" title="Erasmus+ Accredited">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                    </div>
+                    <div className="w-12 h-12 rounded-full bg-yellow-500 border-2 border-current flex items-center justify-center pointer-events-none" title="High Safety Standards">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                    </div>
+                  </div>
+                  <div className="opacity-80 font-medium text-inherit">Safety & Quality Badges</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+{/* SECTION 1.40: HOW IT WORKS */}
         <div className="py-24 relative bg-transparent">
           <div className="absolute inset-0 bg-gray-50 z-0"></div>
           <div className="max-w-7xl mx-auto px-4 relative z-10 transform scale-95 origin-top">

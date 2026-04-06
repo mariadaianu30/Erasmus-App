@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
@@ -8,19 +8,22 @@ import {
   Calendar, 
   MapPin, 
   Users, 
-  Save, 
   ArrowLeft,
   Clock,
-  Building,
   AlertCircle,
   CheckCircle,
   X,
-  Image,
+  Image as ImageIcon,
   DollarSign,
   Languages,
   UtensilsCrossed,
-  Car
+  Car,
+  Upload,
+  ChevronDown,
+  Globe,
+  Tag
 } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 interface User {
   id: string
@@ -32,6 +35,21 @@ interface Profile {
   organization_name?: string
 }
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4 } }
+}
+
 export default function CreateEventPage() {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -39,47 +57,28 @@ export default function CreateEventPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
-  const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({})
-  const [timeoutId, setTimeoutId] = useState<NodeJS.Timeout | null>(null)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
-  // Form state - Restructured to match new event structure
   const [formData, setFormData] = useState({
-    // 1. Title of event
     title: '',
-    // 2. Event type
     event_type: '',
-    // 3. Begin date - end date
     start_date: '',
     end_date: '',
-    // 4. Venue place - city
     venue_place: '',
     city: '',
-    // 5. Venue place - Country
     country: '',
-    // 6. Short description
     short_description: '',
-    // 7. Full description
     full_description: '',
-    // 8. Photo extracted
-    photo_url: '',
-    // 9. Funded (Yes / No)
     is_funded: false,
-    // 10. Target groups
     target_groups: [] as string[],
-    // 11. Group Size
     group_size: 50,
-    // 12. Working language
     working_language: '',
-    // 13. Participation fee (20 $ - reason!!)
     participation_fee: '',
     participation_fee_reason: '',
-    // 14. Details for accommodation and food
     accommodation_food_details: '',
-    // 15. Transport details
     transport_details: ''
   })
 
@@ -95,306 +94,87 @@ export default function CreateEventPage() {
   ]
 
   const targetGroupOptions = [
-    'Youth',
-    'Youth workers',
-    'Trainers',
-    'Youth leaders',
-    'Project managers',
-    'Policy makers',
-    'Volunteering',
-    'Mentors',
-    'Coaches',
-    'Researchers',
-    'Authorities',
-    'Others'
+    'Youth', 'Youth workers', 'Trainers', 'Youth leaders', 'Project managers',
+    'Policy makers', 'Volunteering', 'Mentors', 'Coaches', 'Researchers', 'Authorities', 'Others'
   ]
-  
-  // Countries list for venue country
+
   const countries = [
     'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda', 'Argentina', 'Armenia', 'Australia', 'Austria', 'Azerbaijan',
     'Bahamas', 'Bahrain', 'Bangladesh', 'Barbados', 'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan', 'Bolivia', 'Bosnia and Herzegovina', 'Botswana', 'Brazil', 'Brunei', 'Bulgaria', 'Burkina Faso', 'Burundi',
     'Cabo Verde', 'Cambodia', 'Cameroon', 'Canada', 'Central African Republic', 'Chad', 'Chile', 'China', 'Colombia', 'Comoros', 'Congo', 'Costa Rica', 'Croatia', 'Cuba', 'Cyprus', 'Czech Republic',
-    'Denmark', 'Djibouti', 'Dominica', 'Dominican Republic',
-    'Ecuador', 'Egypt', 'El Salvador', 'Equatorial Guinea', 'Eritrea', 'Estonia', 'Eswatini', 'Ethiopia',
-    'Fiji', 'Finland', 'France',
-    'Gabon', 'Gambia', 'Georgia', 'Germany', 'Ghana', 'Greece', 'Grenada', 'Guatemala', 'Guinea', 'Guinea-Bissau', 'Guyana',
-    'Haiti', 'Honduras', 'Hungary',
-    'Iceland', 'India', 'Indonesia', 'Iran', 'Iraq', 'Ireland', 'Israel', 'Italy',
-    'Jamaica', 'Japan', 'Jordan',
-    'Kazakhstan', 'Kenya', 'Kiribati', 'Kosovo', 'Kuwait', 'Kyrgyzstan',
-    'Laos', 'Latvia', 'Lebanon', 'Lesotho', 'Liberia', 'Libya', 'Liechtenstein', 'Lithuania', 'Luxembourg',
+    'Denmark', 'Djibouti', 'Dominica', 'Dominican Republic', 'Ecuador', 'Egypt', 'El Salvador', 'Equatorial Guinea', 'Eritrea', 'Estonia', 'Eswatini', 'Ethiopia',
+    'Fiji', 'Finland', 'France', 'Gabon', 'Gambia', 'Georgia', 'Germany', 'Ghana', 'Greece', 'Grenada', 'Guatemala', 'Guinea', 'Guinea-Bissau', 'Guyana',
+    'Haiti', 'Honduras', 'Hungary', 'Iceland', 'India', 'Indonesia', 'Iran', 'Iraq', 'Ireland', 'Israel', 'Italy', 'Jamaica', 'Japan', 'Jordan',
+    'Kazakhstan', 'Kenya', 'Kiribati', 'Kosovo', 'Kuwait', 'Kyrgyzstan', 'Laos', 'Latvia', 'Lebanon', 'Lesotho', 'Liberia', 'Libya', 'Liechtenstein', 'Lithuania', 'Luxembourg',
     'Madagascar', 'Malawi', 'Malaysia', 'Maldives', 'Mali', 'Malta', 'Marshall Islands', 'Mauritania', 'Mauritius', 'Mexico', 'Micronesia', 'Moldova', 'Monaco', 'Mongolia', 'Montenegro', 'Morocco', 'Mozambique', 'Myanmar',
-    'Namibia', 'Nauru', 'Nepal', 'Netherlands', 'New Zealand', 'Nicaragua', 'Niger', 'Nigeria', 'North Korea', 'North Macedonia', 'Norway',
-    'Oman',
-    'Pakistan', 'Palau', 'Palestine', 'Panama', 'Papua New Guinea', 'Paraguay', 'Peru', 'Philippines', 'Poland', 'Portugal',
-    'Qatar',
-    'Romania', 'Russia', 'Rwanda',
-    'Saint Kitts and Nevis', 'Saint Lucia', 'Saint Vincent and the Grenadines', 'Samoa', 'San Marino', 'Sao Tome and Principe', 'Saudi Arabia', 'Senegal', 'Serbia', 'Seychelles', 'Sierra Leone', 'Singapore', 'Slovakia', 'Slovenia', 'Solomon Islands', 'Somalia', 'South Africa', 'South Korea', 'South Sudan', 'Spain', 'Sri Lanka', 'Sudan', 'Suriname', 'Sweden', 'Switzerland', 'Syria',
+    'Namibia', 'Nauru', 'Nepal', 'Netherlands', 'New Zealand', 'Nicaragua', 'Niger', 'Nigeria', 'North Korea', 'North Macedonia', 'Norway', 'Oman',
+    'Pakistan', 'Palau', 'Palestine', 'Panama', 'Papua New Guinea', 'Paraguay', 'Peru', 'Philippines', 'Poland', 'Portugal', 'Qatar',
+    'Romania', 'Russia', 'Rwanda', 'Saint Kitts and Nevis', 'Saint Lucia', 'Saint Vincent and the Grenadines', 'Samoa', 'San Marino', 'Sao Tome and Principe', 'Saudi Arabia', 'Senegal', 'Serbia', 'Seychelles', 'Sierra Leone', 'Singapore', 'Slovakia', 'Slovenia', 'Solomon Islands', 'Somalia', 'South Africa', 'South Korea', 'South Sudan', 'Spain', 'Sri Lanka', 'Sudan', 'Suriname', 'Sweden', 'Switzerland', 'Syria',
     'Taiwan', 'Tajikistan', 'Tanzania', 'Thailand', 'Timor-Leste', 'Togo', 'Tonga', 'Trinidad and Tobago', 'Tunisia', 'Turkey', 'Turkmenistan', 'Tuvalu',
-    'Uganda', 'Ukraine', 'United Arab Emirates', 'United Kingdom', 'United States', 'Uruguay', 'Uzbekistan',
-    'Vanuatu', 'Vatican City', 'Venezuela', 'Vietnam',
-    'Yemen',
-    'Zambia', 'Zimbabwe'
+    'Uganda', 'Ukraine', 'United Arab Emirates', 'United Kingdom', 'United States', 'Uruguay', 'Uzbekistan', 'Vanuatu', 'Vatican City', 'Venezuela', 'Vietnam',
+    'Yemen', 'Zambia', 'Zimbabwe'
   ].sort()
 
   useEffect(() => {
     const getSession = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession()
-        
-        if (error) {
-          router.push('/auth')
-          return
-        }
-        
-        if (!session?.user) {
-          router.push('/auth')
-          return
-        }
-
-        setUser(session.user)
-        
-        // Fetch user profile
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('user_type, organization_name')
-          .eq('id', session.user.id)
-          .single()
-
-        if (profileError) {
-          router.push('/auth')
-          return
-        }
-
-        if (profileData.user_type !== 'organization') {
-          router.push('/dashboard')
-          return
-        }
-
-        setProfile(profileData)
-      } catch {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) {
         router.push('/auth')
-      } finally {
-        setLoading(false)
+        return
       }
+      setUser(session.user)
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('user_type, organization_name')
+        .eq('id', session.user.id)
+        .single()
+      if (profileData?.user_type !== 'organization') {
+        router.push('/dashboard')
+        return
+      }
+      setProfile(profileData)
+      setLoading(false)
     }
-
     getSession()
   }, [router])
 
-  const validateField = useCallback((name: string, value: any): string => {
-    switch (name) {
-      case 'title':
-        if (!value || !value.trim()) return 'Event title is required'
-        if (value.trim().length < 3) return 'Title must be at least 3 characters'
-        return ''
-      case 'event_type':
-        if (!value || !value.trim()) return 'Event type is required'
-        return ''
-      case 'start_date':
-        if (!value) return 'Start date is required'
-        if (formData.end_date && new Date(value) >= new Date(formData.end_date)) {
-          return 'Start date must be before end date'
-        }
-        return ''
-      case 'end_date':
-        if (!value) return 'End date is required'
-        if (formData.start_date && new Date(formData.start_date) >= new Date(value)) {
-          return 'End date must be after start date'
-        }
-        return ''
-      case 'group_size':
-        if (value === '' || value === null || value === undefined) return 'Group size is required'
-        const size = typeof value === 'string' ? parseInt(value) : value
-        if (isNaN(size) || size < 1) return 'Group size must be at least 1'
-        if (size > 1000) return 'Group size cannot exceed 1000'
-        return ''
-      case 'participation_fee_reason':
-        if (formData.participation_fee && parseFloat(formData.participation_fee.toString()) > 0) {
-          if (!value || !value.trim()) return 'Participation fee reason is required when a fee is set'
-        }
-        return ''
-      default:
-        return ''
-    }
-  }, [formData.start_date, formData.end_date, formData.participation_fee])
-
-  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target
-    setTouchedFields(prev => ({ ...prev, [name]: true }))
-    const error = validateField(name, value)
-    setFieldErrors(prev => ({ ...prev, [name]: error }))
-  }
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
-    
-    setFormData(prev => {
-      let newValue: any
-      if (type === 'checkbox') {
-        const checked = (e.target as HTMLInputElement).checked
-        newValue = checked
-      } else if (name === 'group_size') {
-        // Allow empty string for proper typing, only parse when there's a value
-        if (value === '') {
-          newValue = ''
-        } else {
-          const parsed = parseInt(value)
-          newValue = isNaN(parsed) ? '' : parsed
-        }
-      } else if (name === 'start_date') {
-        newValue = value
-        // Auto-set end_date to be 1 day after start_date if end_date is empty or before start_date
-        if (value) {
-          const startDate = new Date(value)
-          const currentEndDate = prev.end_date ? new Date(prev.end_date) : null
-          if (!currentEndDate || currentEndDate <= startDate) {
-            const suggestedEndDate = new Date(startDate)
-            suggestedEndDate.setDate(suggestedEndDate.getDate() + 1)
-            // Format as datetime-local (YYYY-MM-DDTHH:mm)
-            const formattedEndDate = suggestedEndDate.toISOString().slice(0, 16)
-            return { ...prev, [name]: newValue, end_date: formattedEndDate }
-          }
-        }
-      } else if (name === 'participation_fee') {
-        newValue = value
-      } else {
-        newValue = value
-      }
-      
-      // Validate field in real-time if it's been touched
-      if (touchedFields[name]) {
-        const error = validateField(name, newValue)
-        setFieldErrors(prev => ({ ...prev, [name]: error }))
-      }
-      
-      return { ...prev, [name]: newValue }
-    })
+    const newValue = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
+    setFormData(prev => ({ ...prev, [name]: newValue }))
   }
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) {
-      setImageFile(null)
-      setImagePreview(null)
-      return
-    }
-
-    if (file.type !== 'image/png') {
-      setError('Please upload a PNG image.')
-      setImageFile(null)
-      setImagePreview(null)
-      return
-    }
-
-    setError('')
-    setImageFile(file)
-    const previewUrl = URL.createObjectURL(file)
-    setImagePreview(previewUrl)
-  }
-
-  useEffect(() => {
-    return () => {
-      if (imagePreview) {
-        URL.revokeObjectURL(imagePreview)
-      }
-    }
-  }, [imagePreview])
-
-  // Auto-dismiss success notification after 3 seconds
-  useEffect(() => {
-    if (success) {
-      const timer = setTimeout(() => {
-        setSuccess('')
-      }, 3000)
-      return () => clearTimeout(timer)
-    }
-  }, [success])
-
-  // Validate participation_fee_reason when participation_fee changes
-  useEffect(() => {
-    if (touchedFields.participation_fee_reason) {
-      const error = validateField('participation_fee_reason', formData.participation_fee_reason)
-      setFieldErrors(prev => ({ ...prev, participation_fee_reason: error }))
-    }
-  }, [formData.participation_fee, formData.participation_fee_reason, touchedFields.participation_fee_reason, validateField])
 
   const handleTargetGroupChange = (group: string) => {
     setFormData(prev => {
       const current = prev.target_groups
       const index = current.indexOf(group)
       if (index > -1) {
-        return {
-          ...prev,
-          target_groups: current.filter(g => g !== group)
-        }
+        return { ...prev, target_groups: current.filter(g => g !== group) }
       } else {
-        return {
-          ...prev,
-          target_groups: [...current, group]
-        }
+        return { ...prev, target_groups: [...current, group] }
       }
     })
   }
 
-  const validateForm = () => {
-    const errors = []
-
-    // 1. Title of event
-    if (!formData.title.trim()) {
-      errors.push('Event title is required')
-    }
-
-    // 2. Event type
-    if (!formData.event_type.trim()) {
-      errors.push('Event type is required')
-    }
-
-    // 3. Begin date - end date
-    if (!formData.start_date) {
-      errors.push('Start date is required')
-    }
-
-    if (!formData.end_date) {
-      errors.push('End date is required')
-    }
-
-    if (formData.start_date && formData.end_date) {
-      const startDate = new Date(formData.start_date)
-      const endDate = new Date(formData.end_date)
-      
-      if (startDate >= endDate) {
-        errors.push('End date must be after start date')
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (file.type !== 'image/png') {
+        setError('Please upload a PNG image.')
+        return
       }
+      setImageFile(file)
+      const reader = new FileReader()
+      reader.onloadend = () => setImagePreview(reader.result as string)
+      reader.readAsDataURL(file)
     }
-
-    // 11. Group Size
-    const groupSize = typeof formData.group_size === 'string' ? parseInt(formData.group_size) : formData.group_size
-    if (!groupSize || groupSize < 1) {
-      errors.push('Group size must be at least 1')
-    }
-
-    if (groupSize > 1000) {
-      errors.push('Group size cannot exceed 1000')
-    }
-
-    // 13. Participation fee reason (if fee is provided)
-    if (formData.participation_fee && parseFloat(formData.participation_fee.toString()) > 0) {
-      if (!formData.participation_fee_reason.trim()) {
-        errors.push('Participation fee reason is required when a fee is set')
-      }
-    }
-
-    return errors
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!user || !profile) return
-
-    const validationErrors = validateForm()
-    if (validationErrors.length > 0) {
-      setError(validationErrors.join('. ') + '.')
+    if (!user || !profile || saving) return
+    if (!formData.title || !formData.event_type || !formData.start_date || !formData.end_date) {
+      setError('Please fill in all required fields.')
       return
     }
 
@@ -403,999 +183,454 @@ export default function CreateEventPage() {
     setSuccess('')
 
     try {
-      let uploadedPhotoUrl: string | null = null
-
+      let uploadedPhotoUrl = null
       if (imageFile) {
-        const fileExtension = imageFile.name.split('.').pop() || 'png'
-        const filePath = `organizations/${user.id}/events/${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExtension}`
-        const { error: uploadError } = await supabase.storage
-          .from('event-images')
-          .upload(filePath, imageFile, {
-            cacheControl: '3600',
-            upsert: false
-          })
-
-        if (uploadError) {
-          throw new Error(uploadError.message || 'Failed to upload image')
-        }
-
-        const { data: publicData } = supabase.storage
-          .from('event-images')
-          .getPublicUrl(filePath)
-
-        uploadedPhotoUrl = publicData.publicUrl
+        const fileExtension = imageFile.name.split('.').pop()
+        const filePath = `events/${user.id}/${Date.now()}.${fileExtension}`
+        const { error: uploadError } = await supabase.storage.from('event-images').upload(filePath, imageFile)
+        if (uploadError) throw uploadError
+        const { data: publicUrl } = supabase.storage.from('event-images').getPublicUrl(filePath)
+        uploadedPhotoUrl = publicUrl.publicUrl
       }
 
-      // Verify user is authenticated - use getSession() to avoid AuthSessionMissingError
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-      const currentUser = session?.user
-      if (sessionError || !currentUser) {
-        setError('You are not logged in. Please log in and try again.')
-        setSaving(false)
-        return
-      }
-      if (sessionError || !session) {
-        setError('Session expired. Please log in again.')
-        setSaving(false)
-        return
-      }
-
-      // Verify user profile exists and is an organization (helps with RLS)
-      const { data: userProfile, error: profileCheckError } = await supabase
-        .from('profiles')
-        .select('user_type, organization_name')
-        .eq('id', currentUser.id)
-        .single()
-
-      if (profileCheckError || !userProfile) {
-        setError('Profile not found. Please complete your profile setup first.')
-        setSaving(false)
-        return
-      }
-
-      if (userProfile.user_type !== 'organization') {
-        setError('Only organizations can create events. Please log in with an organization account.')
-        setSaving(false)
-        return
-      }
-
-      // Convert datetime-local format to ISO format for database
-      let startDateISO: string | null = null
-      let endDateISO: string | null = null
-      
-      try {
-        if (formData.start_date) {
-          const startDate = new Date(formData.start_date)
-          if (isNaN(startDate.getTime())) {
-            throw new Error('Invalid start date format')
-          }
-          startDateISO = startDate.toISOString()
-        }
-        
-        if (formData.end_date) {
-          const endDate = new Date(formData.end_date)
-          if (isNaN(endDate.getTime())) {
-            throw new Error('Invalid end date format')
-          }
-          endDateISO = endDate.toISOString()
-        }
-      } catch (dateError: any) {
-        setError(`Date format error: ${dateError.message}. Please check your date inputs.`)
-        setSaving(false)
-        return
-      }
-
-      if (!startDateISO || !endDateISO) {
-        setError('Start date and end date are required.')
-        setSaving(false)
-        return
-      }
-
-      // Ensure event_type is set (required field)
-      if (!formData.event_type || !formData.event_type.trim()) {
-        setError('Event type is required. Please select an event type from the dropdown.')
-        setSaving(false)
-        return
-      }
-
-      const eventData: any = {
-        // Required fields
+      const eventData = {
         title: formData.title.trim(),
-        start_date: startDateISO,
-        end_date: endDateISO,
-        organization_id: currentUser.id,
-        organization_name: userProfile.organization_name || profile.organization_name || 'Unknown Organization',
-        is_published: true,
-        // New structured fields
-        // Ensure event_type is either a valid enum value or null (not empty string)
-        // Valid enum values: 'Youth exchange', 'Training Course', 'Seminar', 'Study visit', 
-        // 'Partnership - Building Activity', 'Conference simpozion forum', 'E-learning', 'Other'
-        event_type: (() => {
-          const eventType = formData.event_type?.trim()
-          const validEventTypes = [
-            'Youth exchange',
-            'Training Course',
-            'Seminar',
-            'Study visit',
-            'Partnership - Building Activity',
-            'Conference simpozion forum',
-            'E-learning',
-            'Other'
-          ]
-          // Return the value if it's valid, otherwise null
-          return eventType && validEventTypes.includes(eventType) ? eventType : null
-        })(),
-        venue_place: formData.venue_place.trim() || null,
-        city: formData.city.trim() || null,
-        country: formData.country.trim() || null,
-        short_description: formData.short_description.trim() || null,
-        full_description: formData.full_description.trim() || null,
-        photo_url: uploadedPhotoUrl || formData.photo_url || null,
+        event_type: formData.event_type,
+        start_date: new Date(formData.start_date).toISOString(),
+        end_date: new Date(formData.end_date).toISOString(),
+        venue_place: formData.venue_place,
+        city: formData.city,
+        country: formData.country,
+        short_description: formData.short_description,
+        full_description: formData.full_description,
+        description: formData.full_description || formData.short_description || formData.title,
+        photo_url: uploadedPhotoUrl,
         is_funded: formData.is_funded,
-        target_groups: formData.target_groups.length > 0 ? formData.target_groups : null,
-        group_size: typeof formData.group_size === 'string' ? parseInt(formData.group_size) || 1 : formData.group_size,
-        working_language: formData.working_language.trim() || null,
-        participation_fee: formData.participation_fee ? parseFloat(formData.participation_fee.toString()) : null,
-        participation_fee_reason: formData.participation_fee_reason.trim() || null,
-        accommodation_food_details: formData.accommodation_food_details.trim() || null,
-        transport_details: formData.transport_details.trim() || null,
-        // Legacy fields for backward compatibility (set from new fields)
-        // Ensure description is never empty and meets check constraint
-        // The description field has a check constraint that requires it to be non-empty
-        description: (() => {
-          const fullDesc = formData.full_description.trim()
-          const shortDesc = formData.short_description.trim()
-          const titleDesc = formData.title.trim()
-          
-          // Prioritize: full_description > short_description > title
-          // Ensure we always have a non-empty string that meets the constraint
-          if (fullDesc && fullDesc.length > 0) {
-            return fullDesc
-          }
-          if (shortDesc && shortDesc.length > 0) {
-            return shortDesc
-          }
-          if (titleDesc && titleDesc.length > 0) {
-            return `${titleDesc} - Join us for this exciting Erasmus+ event opportunity!`
-          }
-          // Fallback: ensure it's a meaningful description
-          return `Join us for this exciting Erasmus+ event: ${formData.title.trim() || 'Event'}`
-        })(),
-        location: [formData.venue_place, formData.city, formData.country].filter(Boolean).join(', ') || 'Location TBD',
-        max_participants: typeof formData.group_size === 'string' ? parseInt(formData.group_size) || 50 : (formData.group_size || 50),
+        target_groups: formData.target_groups,
+        max_participants: parseInt(formData.group_size.toString()),
+        working_language: formData.working_language,
+        participation_fee: formData.participation_fee ? parseFloat(formData.participation_fee.toString()) : 0,
+        participation_fee_reason: formData.participation_fee_reason,
+        accommodation_food_details: formData.accommodation_food_details,
+        transport_details: formData.transport_details,
+        organization_id: user.id,
+        organization_name: profile.organization_name || 'Organization',
+        is_published: true,
+        location: `${formData.city}, ${formData.country}`,
         category: formData.event_type || 'Other'
       }
-      
-      // Direct insert with timeout protection
-      // Create a timeout that will reject if the request takes too long
-      let timeoutId: NodeJS.Timeout | null = null
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        timeoutId = setTimeout(() => {
-          reject(new Error('Request timed out. Please check your connection and try again.'))
-        }, 20000) // 20 second timeout
-      })
-      
-      // Insert with timeout race
-      const insertPromise = supabase
-        .from('events')
-        .insert(eventData)
-        .select()
-      
-      let data: any = null
-      let insertError: any = null
-      
-      try {
-        // Race between insert and timeout
-        const result = await Promise.race([
-          Promise.resolve(insertPromise).then(result => {
-            // Clear timeout if insert completes
-            if (timeoutId) {
-              clearTimeout(timeoutId)
-              timeoutId = null
-            }
-            return result
-          }).catch(err => {
-            if (timeoutId) {
-              clearTimeout(timeoutId)
-              timeoutId = null
-            }
-            throw err
-          }),
-          timeoutPromise
-        ]) as any
-        
-        // If we get here, the insert completed (not timeout)
-        data = result?.data
-        insertError = result?.error
-      } catch (timeoutError: any) {
-        // Timeout occurred or other error
-        if (timeoutId) {
-          clearTimeout(timeoutId)
-          timeoutId = null
-        }
-        
-        // Check if it's a timeout or network error
-        const isTimeout = timeoutError?.message?.includes('timed out') || timeoutError?.message?.includes('timeout')
-        const errorMessage = isTimeout 
-          ? 'Request timed out. Please check your connection and try again.'
-          : timeoutError?.message || 'Request failed. Please try again.'
-        
-        setError(errorMessage)
-        setSaving(false)
-        return
-      } finally {
-        // Ensure timeout is cleared
-        if (timeoutId) {
-          clearTimeout(timeoutId)
-          timeoutId = null
-        }
-      }
-      
-      if (insertError) {
-        // Provide user-friendly error messages
-        if (insertError.code === '23514') {
-          // Check constraint violation
-          if (insertError.message?.includes('description')) {
-            setError('Description field validation failed. Please ensure you provide a description in either the "Full Description" or "Short Description" field.')
-          } else if (insertError.message?.includes('event_type')) {
-            setError('Event type validation failed. Please select a valid event type from the dropdown.')
-          } else {
-            setError(`Data validation error: ${insertError.message || 'Please check all required fields are filled correctly.'}`)
-          }
-        } else if (insertError.code === '42501' || insertError.message?.includes('permission') || insertError.message?.includes('policy')) {
-          setError('Permission denied. Please ensure you are logged in as an organization account and your profile is set up correctly.')
-        } else if (insertError.code === '23503') {
-          setError('Invalid organization ID. Please log out and log back in, then try again.')
-        } else if (insertError.message?.includes('timeout') || insertError.message?.includes('TIMEOUT')) {
-          setError('Request timed out. Please check your internet connection and try again.')
-        } else {
-          setError(`Failed to create event: ${insertError.message || 'Unknown error'}. Please check the browser console for details.`)
-        }
-        setSaving(false)
-        return
-      }
 
-      if (!data || data.length === 0) {
-        setSaving(false)
-        throw new Error('No data returned from database')
-      }
-
-      // Get the first (and should be only) item
-      const createdEvent = data[0]
+      const { data, error: insertError } = await supabase.from('events').insert(eventData).select()
+      if (insertError) throw insertError
 
       setSuccess('Event created successfully!')
-      
-      // Clear form
-      setFormData({
-        title: '',
-        event_type: '',
-        start_date: '',
-        end_date: '',
-        venue_place: '',
-        city: '',
-        country: '',
-        short_description: '',
-        full_description: '',
-        photo_url: '',
-        is_funded: false,
-        target_groups: [],
-        group_size: 50,
-        working_language: '',
-        participation_fee: '',
-        participation_fee_reason: '',
-        accommodation_food_details: '',
-        transport_details: ''
-      })
-      setImageFile(null)
-      setImagePreview(null)
-
-      // Redirect to event details after showing notification (give time to see it)
-      setTimeout(() => {
-        router.push(`/events/${createdEvent.id}`)
-      }, 3500) // 3.5 seconds to see the notification before redirect
-
-    } catch (error: any) {
-      // Check if it's a timeout error
-      if (error?.message?.includes('timed out') || error?.message?.includes('timeout') || error?.message?.includes('TIMEOUT')) {
-        setError('Request timed out after 20 seconds. Open browser DevTools (F12) → Network tab → Look for the /rest/v1/events request → Check its status code. If it shows 403, RLS is blocking. If it shows pending, the request is hanging. Run TEST_RLS.sql in Supabase to verify policies.')
-      } else if (error?.code === 'PGRST301') {
-        setError('You do not have permission to create events. Please ensure you are logged in as an organization and run FIX_RLS_POLICIES.sql in Supabase.')
-      } else if (error?.code === '23505') {
-        setError('An event with this title already exists. Please choose a different title.')
-      } else if (error?.code === '23514') {
-        setError(`Invalid data provided: ${error?.message || 'Please check all fields and try again.'}`)
-      } else if (error?.code === '42501') {
-        setError('Permission denied. Please run FIX_RLS_POLICIES.sql in Supabase SQL Editor to set up RLS policies.')
-      } else if (error?.code === 'PGRST116') {
-        setError('The request body must contain JSON. Please check your data and try again.')
-      } else if (error?.message?.includes('403') || error?.status === 403) {
-        setError('Access denied. Please ensure you are logged in as an organization and run FIX_RLS_POLICIES.sql in Supabase.')
-      } else if (error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError')) {
-        setError('Network error. Please check your internet connection and try again.')
-      } else if (error?.message) {
-        setError(`Failed to create event: ${error.message}. If this persists, run FIX_RLS_POLICIES.sql in Supabase.`)
-      } else {
-        setError(`Failed to create event. This is likely an RLS policy issue. Please run FIX_RLS_POLICIES.sql in Supabase SQL Editor. Check the browser console for more details.`)
-      }
+      setTimeout(() => router.push(`/events/${data[0].id}`), 2000)
+    } catch (err: any) {
+      setError(err.message || 'An error occurred while creating the event.')
     } finally {
       setSaving(false)
-      if (timeoutId) {
-        clearTimeout(timeoutId)
-        setTimeoutId(null)
-      }
     }
   }
 
-  const handleCancel = () => {
-    setSaving(false)
-    setError('')
-    if (timeoutId) {
-      clearTimeout(timeoutId)
-      setTimeoutId(null)
-    }
-  }
+  const isFormValid = formData.title && formData.event_type && formData.start_date && formData.end_date
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    )
-  }
-
-  if (!user || !profile) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h1>
-          <p className="text-gray-600 mb-6">Only organizations can create events.</p>
-          <Link 
-            href="/auth" 
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
-          >
-            Sign In
-          </Link>
-        </div>
+      <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1A6FE8]"></div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      {/* Success Toast Notification */}
-      {success && (
-        <div className="fixed top-4 right-4 left-4 sm:left-auto z-[9999] animate-slide-in max-w-md mx-auto sm:mx-0">
-          <div className="bg-green-50 border border-green-200 text-green-800 rounded-lg shadow-lg p-4 flex items-start gap-3">
-            <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium">{success}</p>
-            </div>
-            <button
-              onClick={() => setSuccess('')}
-              className="text-green-600 hover:text-green-800 transition-colors flex-shrink-0 p-1 rounded hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-              aria-label="Close notification"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center mb-6">
-            <Link 
-              href="/dashboard/organization" 
-              className="flex items-center text-gray-600 hover:text-gray-900 transition-colors mr-4"
-            >
-              <ArrowLeft className="h-5 w-5 mr-2" />
-              Back to Dashboard
-            </Link>
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900">Create New Event</h1>
-          <p className="text-gray-600 mt-2">Create a new opportunity for participants to join</p>
+    <div className="min-h-screen bg-[#F8FAFF] pt-28 pb-10 font-dm-sans selection:bg-blue-100 selection:text-blue-900">
+      <div className="max-w-7xl mx-auto px-4 md:px-8">
+        
+        {/* HEADER */}
+        <div className="mb-10">
+          <Link 
+            href="/dashboard/organization" 
+            className="inline-flex items-center text-[13px] font-medium text-[#6B7A99] hover:text-[#0D1B3E] transition-colors mb-4 group"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2 group-hover:-translate-x-1 transition-transform" />
+            Back to Dashboard
+          </Link>
+          <h1 className="text-[28px] font-bold text-[#0D1B3E] tracking-tight mb-2">Create New Event</h1>
+          <p className="text-[14px] text-gray-400 font-medium tracking-wide">Create a new opportunity for participants to join</p>
         </div>
 
-        {/* Event Form */}
-        <div className="bg-white rounded-lg shadow-sm border">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Event Information</h2>
-          </div>
+        {/* TWO-COLUMN LAYOUT */}
+        <div className="flex flex-col lg:flex-row gap-8 relative items-start">
           
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
-            {/* 1. Title of event */}
-            <div>
-              <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
-                Title of Event *
-              </label>
-              <div className="relative">
-                <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                <input
-                  type="text"
-                  id="title"
-                  name="title"
-                  value={formData.title}
-                  onChange={handleInputChange}
-                  onBlur={handleBlur}
-                  className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                    touchedFields.title && fieldErrors.title
-                      ? 'border-red-300 focus:ring-red-500'
-                      : touchedFields.title && !fieldErrors.title
-                      ? 'border-green-300 focus:ring-green-500'
-                      : 'border-gray-300'
-                  }`}
-                  placeholder="Enter event title"
-                  required
-                  aria-label="Event title"
-                  aria-invalid={touchedFields.title && !!fieldErrors.title}
-                  aria-describedby={touchedFields.title && fieldErrors.title ? 'title-error' : undefined}
-                />
-                {touchedFields.title && fieldErrors.title && (
-                  <p id="title-error" className="mt-1 text-sm text-red-600 flex items-center gap-1" role="alert">
-                    <span>{fieldErrors.title}</span>
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* 2. Event type */}
-            <div>
-              <label htmlFor="event_type" className="block text-sm font-medium text-gray-700 mb-2">
-                Event Type *
-              </label>
-              <select
-                id="event_type"
-                name="event_type"
-                value={formData.event_type}
-                onChange={handleInputChange}
-                onBlur={handleBlur}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                  touchedFields.event_type && fieldErrors.event_type
-                    ? 'border-red-300 focus:ring-red-500'
-                    : touchedFields.event_type && !fieldErrors.event_type
-                    ? 'border-green-300 focus:ring-green-500'
-                    : 'border-gray-300'
-                }`}
-                required
-              >
-                <option value="">Select event type</option>
-                {eventTypes.map(type => (
-                  <option key={type} value={type}>{type}</option>
-                ))}
-              </select>
-              {touchedFields.event_type && fieldErrors.event_type && (
-                <p className="mt-1 text-sm text-red-600 flex items-center gap-1" role="alert">
-                  <span>{fieldErrors.event_type}</span>
-                </p>
-              )}
-            </div>
-
-            {/* 3. Begin date - end date */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label htmlFor="start_date" className="block text-sm font-medium text-gray-700 mb-2">
-                  Begin Date *
-                </label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                  <input
-                    type="datetime-local"
-                    id="start_date"
-                    name="start_date"
-                    value={formData.start_date}
-                    onChange={handleInputChange}
-                    onBlur={handleBlur}
-                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                      touchedFields.start_date && fieldErrors.start_date
-                        ? 'border-red-300 focus:ring-red-500'
-                        : touchedFields.start_date && !fieldErrors.start_date
-                        ? 'border-green-300 focus:ring-green-500'
-                        : 'border-gray-300'
-                    }`}
-                    required
-                  />
-                </div>
-                {touchedFields.start_date && fieldErrors.start_date && (
-                  <p className="mt-1 text-sm text-red-600 flex items-center gap-1" role="alert">
-                    <span>{fieldErrors.start_date}</span>
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="end_date" className="block text-sm font-medium text-gray-700 mb-2">
-                  End Date *
-                </label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                  <input
-                    type="datetime-local"
-                    id="end_date"
-                    name="end_date"
-                    value={formData.end_date}
-                    onChange={handleInputChange}
-                    onBlur={handleBlur}
-                    min={formData.start_date || undefined}
-                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                      touchedFields.end_date && fieldErrors.end_date
-                        ? 'border-red-300 focus:ring-red-500'
-                        : touchedFields.end_date && !fieldErrors.end_date
-                        ? 'border-green-300 focus:ring-green-500'
-                        : 'border-gray-300'
-                    }`}
-                    required
-                  />
-                </div>
-                {touchedFields.end_date && fieldErrors.end_date && (
-                  <p className="mt-1 text-sm text-red-600 flex items-center gap-1" role="alert">
-                    <span>{fieldErrors.end_date}</span>
-                  </p>
-                )}
-                {formData.start_date && formData.end_date && !fieldErrors.end_date && (
-                  <p className="mt-1 text-xs text-gray-500">
-                    End date automatically set to 1 day after start date. You can adjust it if needed.
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* 4. Venue place - city */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label htmlFor="venue_place" className="block text-sm font-medium text-gray-700 mb-2">
-                  Venue Place
-                </label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                  <input
-                    type="text"
-                    id="venue_place"
-                    name="venue_place"
-                    value={formData.venue_place}
-                    onChange={handleInputChange}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Venue name"
-                  />
-                </div>
-              </div>
-              <div>
-                <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-2">
-                  City
-                </label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                  <input
-                    type="text"
-                    id="city"
-                    name="city"
-                    value={formData.city}
-                    onChange={handleInputChange}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="City"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* 5. Venue place - Country */}
-            <div>
-              <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-2">
-                Country
-              </label>
-              <select
-                id="country"
-                name="country"
-                value={formData.country}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">Select country</option>
-                {countries.map(country => (
-                  <option key={country} value={country}>{country}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* 6. Short description */}
-            <div>
-              <label htmlFor="short_description" className="block text-sm font-medium text-gray-700 mb-2">
-                Short Description
-              </label>
-              <textarea
-                id="short_description"
-                name="short_description"
-                value={formData.short_description}
-                onChange={handleInputChange}
-                rows={3}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                placeholder="Brief summary of the event (for listings)"
-              />
-            </div>
-
-            {/* 7. Full description */}
-            <div>
-              <label htmlFor="full_description" className="block text-sm font-medium text-gray-700 mb-2">
-                Full Description
-              </label>
-              <textarea
-                id="full_description"
-                name="full_description"
-                value={formData.full_description}
-                onChange={handleInputChange}
-                rows={6}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                placeholder="Detailed description of the event, activities, learning outcomes, etc."
-              />
-            </div>
-
-            {/* 8. Event cover image */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                {/* eslint-disable-next-line jsx-a11y/alt-text */}
-                <Image className="h-4 w-4 inline mr-2" aria-hidden="true" />
-                Event Cover Image (PNG)
-              </label>
-              <div className="flex flex-col gap-4">
-                <input
-                  type="file"
-                  accept="image/png"
-                  onChange={handleImageChange}
-                  className="w-full px-4 py-2 border border-dashed border-gray-300 rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-sm text-blue-800 font-medium mb-1">📐 Recommended Dimensions</p>
-                  <p className="text-xs text-blue-700">
-                    <strong>Optimal:</strong> 1920×800px (2.4:1 aspect ratio) or wider<br />
-                    <strong>Minimum:</strong> 1200×500px<br />
-                    This image will be displayed prominently at the top of the event detail page as a hero image.
-                  </p>
-                </div>
-                {(imagePreview || formData.photo_url) && (
-                  <div className="relative">
-                    <div className="relative w-full h-[300px] sm:h-[400px] rounded-lg overflow-hidden border-2 border-gray-200 shadow-sm">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={imagePreview || formData.photo_url || undefined}
-                        alt="Event preview"
-                        className="w-full h-full object-cover"
+          {/* LEFT COLUMN - FORM */}
+          <div className="w-full lg:w-[60%] space-y-10 pb-32">
+            
+            {/* CARD 1 - EVENT INFORMATION */}
+            <div className="space-y-4">
+               <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Event Information</p>
+               <div className="bg-white rounded-[24px] border border-[#E2ECFB] p-8 shadow-sm">
+                 <div className="grid grid-cols-1 gap-6">
+                    <div>
+                      <label className="block text-[13px] font-bold text-[#6B7A99] mb-2 uppercase tracking-widest">Title of Event <span className="text-[#1A6FE8]">*</span></label>
+                      <input 
+                        type="text" name="title" value={formData.title} onChange={handleInputChange}
+                        placeholder="e.g. Erasmus+ Training on Digital Literacy"
+                        className="w-full h-[48px] px-5 bg-[#F8FAFF] border border-[#D0DCF5] rounded-xl text-[14px] font-medium focus:outline-none focus:ring-2 focus:ring-[#1A6FE8]/20 focus:border-[#1A6FE8] transition-all"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent pointer-events-none"></div>
                     </div>
-                    {imagePreview && (
-                      <p className="text-xs text-gray-500 mt-2 text-center">
-                        Preview: This is how your image will appear on the event detail page
-                      </p>
+                    <div>
+                      <label className="block text-[13px] font-bold text-[#6B7A99] mb-2 uppercase tracking-widest">Event Type <span className="text-[#1A6FE8]">*</span></label>
+                      <div className="relative">
+                        <select 
+                          name="event_type" value={formData.event_type} onChange={handleInputChange}
+                          className="w-full h-[48px] px-5 bg-[#F8FAFF] border border-[#D0DCF5] rounded-xl text-[14px] font-medium focus:outline-none focus:ring-2 focus:ring-[#1A6FE8]/20 focus:border-[#1A6FE8] transition-all appearance-none cursor-pointer"
+                        >
+                          <option value="">Select event type</option>
+                          {eventTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                        <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={18} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-[13px] font-bold text-[#6B7A99] mb-2 uppercase tracking-widest">Begin Date <span className="text-[#1A6FE8]">*</span></label>
+                        <input 
+                          type="datetime-local" name="start_date" value={formData.start_date} onChange={handleInputChange}
+                          className="w-full h-[48px] px-5 bg-[#F8FAFF] border border-[#D0DCF5] rounded-xl text-[14px] font-medium focus:outline-none focus:ring-2 focus:ring-[#1A6FE8]/20 focus:border-[#1A6FE8] transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[13px] font-bold text-[#6B7A99] mb-2 uppercase tracking-widest">End Date <span className="text-[#1A6FE8]">*</span></label>
+                        <input 
+                          type="datetime-local" name="end_date" value={formData.end_date} onChange={handleInputChange}
+                          className="w-full h-[48px] px-5 bg-[#F8FAFF] border border-[#D0DCF5] rounded-xl text-[14px] font-medium focus:outline-none focus:ring-2 focus:ring-[#1A6FE8]/20 focus:border-[#1A6FE8] transition-all"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[13px] font-bold text-[#6B7A99] mb-2 uppercase tracking-widest">Venue Place</label>
+                      <input 
+                        type="text" name="venue_place" value={formData.venue_place} onChange={handleInputChange}
+                        placeholder="e.g. European Youth Centre"
+                        className="w-full h-[48px] px-5 bg-[#F8FAFF] border border-[#D0DCF5] rounded-xl text-[14px] font-medium focus:outline-none focus:border-[#1A6FE8] transition-all"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-[13px] font-bold text-[#6B7A99] mb-2 uppercase tracking-widest">City</label>
+                        <input 
+                          type="text" name="city" value={formData.city} onChange={handleInputChange}
+                          placeholder="e.g. Bucharest"
+                          className="w-full h-[48px] px-5 bg-[#F8FAFF] border border-[#D0DCF5] rounded-xl text-[14px] font-medium focus:outline-none focus:border-[#1A6FE8] transition-all"
+                        />
+                      </div>
+                      <div>
+                         <label className="block text-[13px] font-bold text-[#6B7A99] mb-2 uppercase tracking-widest">Country</label>
+                         <div className="relative">
+                            <select 
+                              name="country" value={formData.country} onChange={handleInputChange}
+                              className="w-full h-[48px] px-5 bg-[#F8FAFF] border border-[#D0DCF5] rounded-xl text-[14px] font-medium focus:outline-none focus:border-[#1A6FE8] transition-all appearance-none cursor-pointer"
+                            >
+                              <option value="">Select country</option>
+                              {countries.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                            <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={18} />
+                         </div>
+                      </div>
+                    </div>
+                 </div>
+               </div>
+            </div>
+
+            {/* CARD 2 - DESCRIPTION */}
+            <div className="space-y-4">
+               <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Description</p>
+               <div className="bg-white rounded-[24px] border border-[#E2ECFB] p-8 shadow-sm">
+                  <div className="grid grid-cols-1 gap-6">
+                    <div>
+                      <label className="block text-[13px] font-bold text-[#6B7A99] mb-2 uppercase tracking-widest">Short Description</label>
+                      <textarea 
+                        name="short_description" value={formData.short_description} onChange={handleInputChange} rows={3}
+                        placeholder="A brief summary shown in event listings..."
+                        className="w-full px-5 py-4 bg-[#F8FAFF] border border-[#D0DCF5] rounded-xl text-[14px] font-medium focus:outline-none focus:border-[#1A6FE8] transition-all resize-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[13px] font-bold text-[#6B7A99] mb-2 uppercase tracking-widest">Full Description</label>
+                      <textarea 
+                        name="full_description" value={formData.full_description} onChange={handleInputChange} rows={6}
+                        placeholder="Detailed information about the event, programme, objectives..."
+                        className="w-full px-5 py-4 bg-[#F8FAFF] border border-[#D0DCF5] rounded-xl text-[14px] font-medium focus:outline-none focus:border-[#1A6FE8] transition-all resize-none"
+                      />
+                    </div>
+                  </div>
+               </div>
+            </div>
+
+            {/* CARD 3 - EVENT COVER IMAGE */}
+            <div className="space-y-4">
+               <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Event Cover Image</p>
+               <div className="bg-white rounded-[24px] border border-[#E2ECFB] p-8 shadow-sm">
+                  <div 
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`relative w-full h-[240px] border-2 border-dashed rounded-[20px] bg-[#F8FAFF] transition-all cursor-pointer overflow-hidden flex flex-col items-center justify-center group ${imagePreview ? 'border-blue-200' : 'border-[#D0DCF5] hover:border-[#1A6FE8]'}`}
+                  >
+                    <input ref={fileInputRef} type="file" className="hidden" accept="image/png" onChange={handleImageChange} />
+                    
+                    {imagePreview ? (
+                      <div className="absolute inset-0">
+                         <img src={imagePreview} className="w-full h-full object-cover" alt="Preview" />
+                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <div className="bg-white/20 backdrop-blur-md px-5 py-2.5 rounded-full text-white text-[12px] font-bold border border-white/30">Replace Image</div>
+                         </div>
+                         <button 
+                            onClick={(e) => { e.stopPropagation(); setImageFile(null); setImagePreview(null); }}
+                            className="absolute top-4 right-4 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center text-rose-500 shadow-lg hover:bg-rose-500 hover:text-white transition-all"
+                          >
+                           <X size={16} />
+                         </button>
+                      </div>
+                    ) : (
+                      <div className="text-center">
+                         <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 text-[#1A6FE8] shadow-sm group-hover:scale-110 transition-transform">
+                            <Upload size={24} />
+                         </div>
+                         <p className="text-[15px] font-bold text-[#0D1B3E] mb-1">Drag & drop your image here</p>
+                         <p className="text-[13px] text-[#6B7A99]">or <span className="text-[#1A6FE8] font-bold">browse files</span></p>
+                         <p className="mt-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Recommended: 1920×800px · PNG format</p>
+                      </div>
                     )}
                   </div>
-                )}
-              </div>
+               </div>
             </div>
 
-            {/* 9. Funded (Yes / No) */}
-            <div>
-              <label className="flex items-center space-x-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="is_funded"
-                  checked={formData.is_funded}
-                  onChange={handleInputChange}
-                  className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                />
-                <span className="text-sm font-medium text-gray-700">Funded (Yes / No)</span>
-              </label>
+            {/* CARD 4 - PARTICIPANTS & LOGISTICS */}
+            <div className="space-y-4">
+               <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Participants & Logistics</p>
+               <div className="bg-white rounded-[24px] border border-[#E2ECFB] p-8 shadow-sm">
+                  <div className="grid grid-cols-1 gap-8">
+                    <div className="flex items-center justify-between bg-[#F8FAFF] p-4 rounded-xl border border-[#F0F5FF]">
+                      <div>
+                        <p className="text-[14px] font-bold text-[#0D1B3E]">Funded Project</p>
+                        <p className="text-[12px] text-gray-400">Is this project funded by Erasmus+ or similar programs?</p>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, is_funded: !prev.is_funded }))}
+                        className={`w-14 h-8 rounded-full transition-all relative ${formData.is_funded ? 'bg-[#1A6FE8]' : 'bg-gray-200'}`}
+                      >
+                         <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-sm ${formData.is_funded ? 'left-7' : 'left-1'}`} />
+                      </button>
+                    </div>
+
+                    <div>
+                       <label className="block text-[13px] font-bold text-[#6B7A99] mb-4 uppercase tracking-widest">Target Groups</label>
+                       <div className="flex flex-wrap gap-2">
+                          {targetGroupOptions.map(group => (
+                            <button 
+                              key={group} type="button"
+                              onClick={() => handleTargetGroupChange(group)}
+                              className={`px-5 py-2.5 rounded-full text-[12px] font-bold transition-all border ${formData.target_groups.includes(group) ? 'bg-[#1A6FE8] text-white border-[#1A6FE8] shadow-md' : 'bg-white text-gray-500 border-[#E2ECFB] hover:border-blue-200'}`}
+                            >
+                               {group}
+                            </button>
+                          ))}
+                       </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-[13px] font-bold text-[#6B7A99] mb-2 uppercase tracking-widest">Group Size <span className="text-[#1A6FE8]">*</span></label>
+                        <div className="relative">
+                          <input 
+                            type="number" name="group_size" value={formData.group_size} onChange={handleInputChange}
+                            className="w-full h-[48px] px-5 bg-[#F8FAFF] border border-[#D0DCF5] rounded-xl text-[14px] font-medium focus:outline-none focus:border-[#1A6FE8] transition-all"
+                          />
+                          <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[12px] font-black text-gray-400 uppercase tracking-widest pointer-events-none">Participants</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[13px] font-bold text-[#6B7A99] mb-2 uppercase tracking-widest">Working Language</label>
+                        <input 
+                          type="text" name="working_language" value={formData.working_language} onChange={handleInputChange}
+                          placeholder="e.g. English, French"
+                          className="w-full h-[48px] px-5 bg-[#F8FAFF] border border-[#D0DCF5] rounded-xl text-[14px] font-medium focus:outline-none focus:border-[#1A6FE8] transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                       <label className="block text-[13px] font-bold text-[#6B7A99] mb-2 uppercase tracking-widest">Participation Fee (€)</label>
+                       <div className="relative">
+                          <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400">€</span>
+                          <input 
+                            type="number" name="participation_fee" value={formData.participation_fee} onChange={handleInputChange}
+                            placeholder="0"
+                            className="w-full h-[48px] pl-10 pr-5 bg-[#F8FAFF] border border-[#D0DCF5] rounded-xl text-[14px] font-medium focus:outline-none focus:border-[#1A6FE8] transition-all"
+                          />
+                       </div>
+                    </div>
+
+                    <AnimatePresence>
+                      {formData.participation_fee && parseFloat(formData.participation_fee.toString()) > 0 && (
+                        <motion.div 
+                          initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                          className="overflow-hidden"
+                        >
+                           <label className="block text-[13px] font-bold text-[#6B7A99] mb-2 uppercase tracking-widest">Fee Reason <span className="text-[#1A6FE8]">*</span></label>
+                           <textarea 
+                             name="participation_fee_reason" value={formData.participation_fee_reason} onChange={handleInputChange} rows={2}
+                             placeholder="Explain why this fee is necessary..."
+                             className="w-full px-5 py-4 bg-[#F8FAFF] border border-[#D0DCF5] rounded-xl text-[14px] font-medium focus:outline-none focus:border-[#1A6FE8] transition-all resize-none"
+                           />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+               </div>
             </div>
 
-            {/* 10. Target groups */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Target Groups (Select all that apply)
-              </label>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-4 border border-gray-300 rounded-lg">
-                {targetGroupOptions.map(group => (
-                  <label key={group} className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.target_groups.includes(group)}
-                      onChange={() => handleTargetGroupChange(group)}
-                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-gray-700">{group}</span>
-                  </label>
-                ))}
-              </div>
+            {/* CARD 5 - ADDITIONAL DETAILS */}
+            <div className="space-y-4">
+               <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Additional Details</p>
+               <div className="bg-white rounded-[24px] border border-[#E2ECFB] p-8 shadow-sm">
+                  <div className="grid grid-cols-1 gap-6">
+                    <div>
+                      <label className="block text-[13px] font-bold text-[#6B7A99] mb-2 uppercase tracking-widest">Accommodation and Food</label>
+                      <textarea 
+                        name="accommodation_food_details" value={formData.accommodation_food_details} onChange={handleInputChange} rows={3}
+                        placeholder="Details about dietary options, room types..."
+                        className="w-full px-5 py-4 bg-[#F8FAFF] border border-[#D0DCF5] rounded-xl text-[14px] font-medium focus:outline-none focus:border-[#1A6FE8] transition-all resize-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[13px] font-bold text-[#6B7A99] mb-2 uppercase tracking-widest">Transport Details</label>
+                      <textarea 
+                        name="transport_details" value={formData.transport_details} onChange={handleInputChange} rows={3}
+                        placeholder="Information about travel reimbursement, local transport..."
+                        className="w-full px-5 py-4 bg-[#F8FAFF] border border-[#D0DCF5] rounded-xl text-[14px] font-medium focus:outline-none focus:border-[#1A6FE8] transition-all resize-none"
+                      />
+                    </div>
+                  </div>
+               </div>
             </div>
+          </div>
 
-            {/* 11. Group Size */}
-            <div>
-              <label htmlFor="group_size" className="block text-sm font-medium text-gray-700 mb-2">
-                Group Size *
-              </label>
-              <div className="relative">
-                <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                <input
-                  type="number"
-                  id="group_size"
-                  name="group_size"
-                  value={typeof formData.group_size === 'string' && formData.group_size === '' ? '' : String(formData.group_size || '')}
-                  onChange={handleInputChange}
-                  onBlur={(e) => {
-                    // On blur, if empty, set to default value of 1
-                    if (e.target.value === '' || parseInt(e.target.value) < 1) {
-                      setFormData(prev => ({ ...prev, group_size: 1 }))
-                    } else {
-                      const val = parseInt(e.target.value)
-                      if (!isNaN(val) && val >= 1 && val <= 1000) {
-                        setFormData(prev => ({ ...prev, group_size: val }))
-                      }
-                    }
-                    handleBlur(e)
-                  }}
-                  min="1"
-                  max="1000"
-                  className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                    touchedFields.group_size && fieldErrors.group_size
-                      ? 'border-red-300 focus:ring-red-500'
-                      : touchedFields.group_size && !fieldErrors.group_size
-                      ? 'border-green-300 focus:ring-green-500'
-                      : 'border-gray-300'
-                  }`}
-                  required
-                />
-              </div>
-              {touchedFields.group_size && fieldErrors.group_size && (
-                <p className="mt-1 text-sm text-red-600 flex items-center gap-1" role="alert">
-                  <span>{fieldErrors.group_size}</span>
-                </p>
-              )}
-            </div>
-
-            {/* 12. Working language */}
-            <div>
-              <label htmlFor="working_language" className="block text-sm font-medium text-gray-700 mb-2">
-                <Languages className="h-4 w-4 inline mr-2" />
-                Working Language
-              </label>
-              <input
-                type="text"
-                id="working_language"
-                name="working_language"
-                value={formData.working_language}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="e.g., English, Spanish"
-              />
-            </div>
-
-            {/* 13. Participation fee (20 $ - reason!!) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label htmlFor="participation_fee" className="block text-sm font-medium text-gray-700 mb-2">
-                  <DollarSign className="h-4 w-4 inline mr-2" />
-                  Participation Fee ($)
-                </label>
-                <input
-                  type="number"
-                  id="participation_fee"
-                  name="participation_fee"
-                  value={formData.participation_fee}
-                  onChange={handleInputChange}
-                  min="0"
-                  step="0.01"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="0.00"
-                />
-              </div>
-              <div>
-                <label htmlFor="participation_fee_reason" className="block text-sm font-medium text-gray-700 mb-2">
-                  Participation Fee Reason *
-                </label>
-                <textarea
-                  id="participation_fee_reason"
-                  name="participation_fee_reason"
-                  value={formData.participation_fee_reason}
-                  onChange={handleInputChange}
-                  onBlur={handleBlur}
-                  rows={3}
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-colors ${
-                    touchedFields.participation_fee_reason && fieldErrors.participation_fee_reason
-                      ? 'border-red-300 focus:ring-red-500'
-                      : touchedFields.participation_fee_reason && !fieldErrors.participation_fee_reason
-                      ? 'border-green-300 focus:ring-green-500'
-                      : 'border-gray-300'
-                  }`}
-                  placeholder="Please explain why there is a participation fee"
-                  required={Number(formData.participation_fee || 0) > 0}
-                />
-                {touchedFields.participation_fee_reason && fieldErrors.participation_fee_reason && (
-                  <p className="mt-1 text-sm text-red-600 flex items-center gap-1" role="alert">
-                    <span>{fieldErrors.participation_fee_reason}</span>
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* 14. Details for accommodation and food */}
-            <div>
-              <label htmlFor="accommodation_food_details" className="block text-sm font-medium text-gray-700 mb-2">
-                <UtensilsCrossed className="h-4 w-4 inline mr-2" />
-                Details for Accommodation and Food
-              </label>
-              <textarea
-                id="accommodation_food_details"
-                name="accommodation_food_details"
-                value={formData.accommodation_food_details}
-                onChange={handleInputChange}
-                rows={4}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                placeholder="Information about accommodation type, meals included, dietary options, etc."
-              />
-            </div>
-
-            {/* 15. Transport details */}
-            <div>
-              <label htmlFor="transport_details" className="block text-sm font-medium text-gray-700 mb-2">
-                <Car className="h-4 w-4 inline mr-2" />
-                Transport Details
-              </label>
-              <textarea
-                id="transport_details"
-                name="transport_details"
-                value={formData.transport_details}
-                onChange={handleInputChange}
-                rows={4}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                placeholder="Information about transportation, travel reimbursement, pick-up services, etc."
-              />
-            </div>
-
-            {/* Error and Success Messages */}
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="flex items-center">
-                  <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
-                  <p className="text-red-700 text-sm">{error}</p>
+          {/* RIGHT COLUMN - STICKY PREVIEW */}
+          <div className="w-full lg:w-[40%] lg:sticky lg:top-32">
+             <div className="bg-white rounded-[32px] border border-[#E2ECFB] shadow-xl overflow-hidden">
+                <div className="p-6 border-b border-[#F8FAFF] bg-white">
+                   <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Event Preview</p>
+                   <p className="text-[12px] font-medium text-[#6B7A99]">How your event will appear to participants</p>
                 </div>
-              </div>
-            )}
 
+                {/* PREVIEW BODY */}
+                <div className="p-6">
+                   <div className="relative rounded-[24px] overflow-hidden aspect-[1.8/1] bg-blue-50 mb-6">
+                      {imagePreview ? (
+                        <img src={imagePreview} className="w-full h-full object-cover" alt="Preview" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#E8F1FD] to-blue-100">
+                           <ImageIcon size={32} className="text-[#1A6FE8]/20" />
+                        </div>
+                      )}
+                      
+                      <div className="absolute top-4 left-4">
+                         <span className="bg-[#1A6FE8] text-white px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shadow-lg">
+                           {formData.event_type || 'Training Course'}
+                         </span>
+                      </div>
+                   </div>
 
-            {/* Submit Button */}
-            <div className="flex justify-end space-x-4">
-              {saving ? (
-                <button
-                  type="button"
-                  onClick={handleCancel}
-                  className="px-6 py-3 border border-red-300 rounded-lg font-medium text-red-700 hover:bg-red-50 transition-colors"
-                >
-                  Cancel
-                </button>
-              ) : (
-                <Link
-                  href="/dashboard/organization"
-                  className="px-6 py-3 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </Link>
-              )}
-              <button
-                type="submit"
-                disabled={saving}
-                className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-              >
-                {saving ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Creating Event...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Create Event
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
+                   <div className="space-y-4">
+                      <h3 className={`text-[20px] font-bold leading-tight ${formData.title ? 'text-[#0D1B3E]' : 'text-gray-300'}`}>
+                        {formData.title || 'Event Title'}
+                      </h3>
+                      <p className="text-[13px] font-medium text-[#6B7A99]">by {profile?.organization_name || 'Example'}</p>
+                      
+                      <div className="flex flex-col gap-3 py-2">
+                         <div className="flex items-center gap-3 text-[#6B7A99]">
+                            <div className="w-8 h-8 rounded-lg bg-[#F8FAFF] flex items-center justify-center text-[#1A6FE8] shadow-sm">
+                               <Calendar size={14} />
+                            </div>
+                            <span className={`text-[13px] font-bold ${formData.start_date ? 'text-[#0D1B3E]' : 'text-gray-300'}`}>
+                               {formData.start_date ? new Date(formData.start_date).toLocaleDateString() : 'Dates not set'}
+                               {formData.end_date && ` – ${new Date(formData.end_date).toLocaleDateString()}`}
+                            </span>
+                         </div>
+                         <div className="flex items-center gap-3 text-[#6B7A99]">
+                            <div className="w-8 h-8 rounded-lg bg-[#F8FAFF] flex items-center justify-center text-[#1A6FE8] shadow-sm">
+                               <MapPin size={14} />
+                            </div>
+                            <span className={`text-[13px] font-bold ${formData.city || formData.country ? 'text-[#0D1B3E]' : 'text-gray-300'}`}>
+                               {[formData.city, formData.country].filter(Boolean).join(', ') || 'Location TBD'}
+                            </span>
+                         </div>
+                      </div>
+
+                      <div className="h-px bg-[#F8FAFF] w-full" />
+
+                      <p className={`text-[13px] leading-relaxed line-clamp-2 ${formData.short_description ? 'text-[#0D1B3E]/70' : 'text-gray-300'}`}>
+                        {formData.short_description || 'Brief project description will appear here...'}
+                      </p>
+
+                      <div className="flex flex-wrap items-center gap-3 pt-2">
+                         <div className="flex items-center gap-2 bg-blue-50 text-[#1A6FE8] px-3.5 py-1.5 rounded-full text-[11px] font-bold border border-blue-100">
+                            <Users size={12} /> {formData.group_size} participants
+                         </div>
+                         {formData.is_funded && (
+                           <div className="flex items-center gap-2 bg-emerald-50 text-emerald-600 px-3.5 py-1.5 rounded-full text-[11px] font-bold border border-emerald-100">
+                              Funded
+                           </div>
+                         )}
+                      </div>
+
+                      <div className="flex flex-wrap gap-1.5 pt-2">
+                         {formData.target_groups.slice(0, 3).map(g => (
+                           <span key={g} className="px-3 py-1 rounded-full border border-[#E2ECFB] text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                             {g}
+                           </span>
+                         ))}
+                         {formData.target_groups.length > 3 && (
+                           <span className="px-3 py-1 rounded-full text-[10px] font-black text-[#1A6FE8] uppercase tracking-wider">
+                             +{formData.target_groups.length - 3} more
+                           </span>
+                         )}
+                      </div>
+                   </div>
+                </div>
+             </div>
+          </div>
         </div>
 
-        {/* Event Preview */}
-        <div className="mt-8 bg-white rounded-lg shadow-sm border">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">Event Preview</h3>
-            <p className="text-sm text-gray-600">How your event will appear to participants</p>
-          </div>
-          <div className="p-6">
-            <div className="border border-gray-200 rounded-lg p-4">
-              <h4 className="text-xl font-semibold text-gray-900 mb-2">
-                {formData.title || 'Event Title'}
-              </h4>
-              <p className="text-gray-600 text-sm mb-4">
-                by <span className="font-medium">{profile.organization_name || 'Your Organization'}</span>
-              </p>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                {formData.event_type && (
-                  <div className="flex items-center text-gray-700">
-                    <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs font-medium">
-                      {formData.event_type}
-                    </span>
-                  </div>
-                )}
-                {formData.start_date && (
-                  <div className="flex items-center text-gray-700">
-                    <Calendar className="h-4 w-4 text-blue-600 mr-2" />
-                    <span className="text-sm">
-                      {new Date(formData.start_date).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </span>
-                  </div>
-                )}
-                {formData.end_date && (
-                  <div className="flex items-center text-gray-700">
-                    <Clock className="h-4 w-4 text-blue-600 mr-2" />
-                    <span className="text-sm">
-                      Until {new Date(formData.end_date).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric'
-                      })}
-                    </span>
-                  </div>
-                )}
-                {(formData.venue_place || formData.city || formData.country) && (
-                  <div className="flex items-center text-gray-700">
-                    <MapPin className="h-4 w-4 text-blue-600 mr-2" />
-                    <span className="text-sm">
-                      {[formData.venue_place, formData.city, formData.country].filter(Boolean).join(', ') || 'Location TBD'}
-                    </span>
-                  </div>
-                )}
-                {formData.group_size && (
-                  <div className="flex items-center text-gray-700">
-                    <Users className="h-4 w-4 text-blue-600 mr-2" />
-                    <span className="text-sm">Group Size: {formData.group_size} participants</span>
-                  </div>
-                )}
-                {formData.is_funded && (
-                  <div className="flex items-center text-gray-700">
-                    <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
-                      ✓ Funded
-                    </span>
-                  </div>
-                )}
+        {/* STICKY BOTTOM BAR (LEFT Column) */}
+        <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none">
+           <div className="max-w-7xl mx-auto px-4 md:px-8">
+              <div className="w-full lg:w-[60%] pointer-events-auto bg-white/80 backdrop-blur-lg border-t border-[#E2ECFB] p-6 rounded-t-[32px] shadow-[0_-12px_40px_rgba(13,27,62,0.06)] flex items-center justify-between">
+                 <button 
+                   onClick={() => router.back()}
+                   className="px-6 py-4 rounded-xl text-[14px] font-bold text-[#6B7A99] hover:bg-gray-50 transition-all flex items-center gap-2"
+                 >
+                   Cancel
+                 </button>
+                 <div className="flex items-center gap-4">
+                   {error && <span className="text-rose-500 text-[13px] font-bold hidden md:inline">{error}</span>}
+                   <button 
+                     disabled={!isFormValid || saving}
+                     onClick={handleSubmit}
+                     className={`px-8 py-4 rounded-2xl text-[14px] font-bold uppercase tracking-widest transition-all flex items-center gap-3 ${isFormValid && !saving ? 'bg-[#1A6FE8] text-white shadow-xl shadow-[#1A6FE8]/20 hover:-translate-y-1' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                   >
+                     {saving ? (
+                       <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                     ) : (
+                       <>Create Event <CheckCircle size={18} /></>
+                     )}
+                   </button>
+                 </div>
               </div>
-              
-              {(imagePreview || formData.photo_url) && (
-                <div className="mb-4">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={imagePreview || formData.photo_url || undefined}
-                    alt="Event photo"
-                    className="w-full h-48 object-cover rounded-lg"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none'
-                    }}
-                  />
-                </div>
-              )}
-              
-              {formData.short_description && (
-                <p className="text-gray-600 text-sm mb-2 line-clamp-3">{formData.short_description}</p>
-              )}
-              {formData.full_description && (
-                <p className="text-gray-600 text-sm line-clamp-3">{formData.full_description}</p>
-              )}
-            </div>
-          </div>
+           </div>
         </div>
       </div>
     </div>
   )
 }
-

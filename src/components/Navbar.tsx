@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { signOutEverywhere } from '@/lib/auth-client'
-import { Menu, X, Calendar, User, LogOut } from 'lucide-react'
+import { Menu, X, Calendar, User, LogOut, ChevronDown } from 'lucide-react'
 
 interface User {
   id: string
@@ -26,7 +26,8 @@ interface Profile {
 }
 
 export default function Navbar() {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<User | null>(null);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -34,6 +35,22 @@ export default function Navbar() {
   const router = useRouter()
   const pathname = usePathname()
   const isEventsPage = pathname?.startsWith('/events')
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+
+  useEffect(() => {
+    const checkSidebar = () => {
+      setIsSidebarOpen(document.body.classList.contains('sidebar-open'))
+    }
+    
+    // Initial check
+    checkSidebar()
+
+    // Listen for body class changes
+    const observer = new MutationObserver(checkSidebar)
+    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] })
+    
+    return () => observer.disconnect()
+  }, [])
 
   const fetchProfile = useCallback(async (userId: string, retryCount = 0) => {
     try {
@@ -234,21 +251,15 @@ export default function Navbar() {
       { name: 'Organizations', href: '/organizations' },
     ]
 
-    // Default dashboard tab (also covers logged out state)
-    const dashboardItem = {
-      name: 'Dashboard',
-      href: profile?.user_type === 'organization' ? '/dashboard/organization' : '/dashboard',
-    }
-
     if (!user || !profile) {
-      return [...baseItems, dashboardItem]
+      return baseItems
     }
 
     if (profile.user_type === 'organization') {
-      return [...baseItems, dashboardItem, { name: 'Projects', href: '/projects' }]
+      return [...baseItems, { name: 'Projects', href: '/projects' }]
     }
 
-    return [...baseItems, dashboardItem]
+    return baseItems
   }
 
   const isRouteActive = (href: string) => {
@@ -271,8 +282,8 @@ export default function Navbar() {
       return [
         'px-3 py-2 rounded-md text-sm font-medium transition-colors border',
         active
-          ? 'bg-blue-800 text-white border-blue-700 shadow-sm'
-          : 'text-blue-100 hover:text-white border-transparent',
+          ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-sm'
+          : 'text-gray-700 hover:text-blue-600 border-transparent',
       ].join(' ')
     }
     return [
@@ -298,10 +309,10 @@ export default function Navbar() {
       {/* Logo */}
       <div className="flex items-center">
         <Link href="/" className="flex items-center group">
-          <Calendar className={`h-8 w-8 transition-colors duration-200 ${isEventsPage ? 'text-white group-hover:text-blue-100' : 'text-blue-600 group-hover:text-blue-700'}`} />
+          <Calendar className={`h-8 w-8 transition-colors duration-200 ${isEventsPage ? 'text-[#003399] group-hover:text-blue-700' : 'text-blue-600 group-hover:text-blue-700'}`} />
           <div className="ml-2">
-            <div className={`text-xl font-bold transition-colors duration-200 ${isEventsPage ? 'text-white group-hover:text-blue-100' : 'text-gray-900 group-hover:text-blue-600'}`}>Erasmus+ Connect</div>
-            <div className={`text-xs -mt-1 ${isEventsPage ? 'text-blue-200' : 'text-gray-500'}`}>by Scout Society</div>
+            <div className={`text-xl font-bold transition-colors duration-200 ${isEventsPage ? 'text-[#003399] group-hover:text-blue-600' : 'text-gray-900 group-hover:text-blue-600'}`}>Erasmus+ Connect</div>
+            <div className={`text-xs -mt-1 ${isEventsPage ? 'text-blue-900/40' : 'text-gray-500'}`}>by Scout Society</div>
           </div>
         </Link>
       </div>
@@ -319,34 +330,55 @@ export default function Navbar() {
         ))}
       </div>
 
-      {/* User Menu */}
-      <div className="hidden md:flex items-center space-x-4">
+      {/* User Menu with dropdown */}
+      <div 
+        className="hidden md:flex items-center space-x-4 relative h-full" 
+        onMouseEnter={() => setUserMenuOpen(true)} 
+        onMouseLeave={() => setUserMenuOpen(false)}
+      >
         {user ? (
-          <div className="flex items-center space-x-4">
-            <Link
-              href="/profile"
-              className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${isEventsPage ? 'text-white hover:text-blue-200' : 'text-gray-700 hover:text-blue-600'}`}
-            >
+          <div className="flex items-center h-full">
+            <button className="flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors hover:text-blue-600 focus:outline-none">
               <User className="h-4 w-4 mr-2" />
               {getDisplayName()}
-            </Link>
-            <button
-              onClick={handleSignOut}
-              disabled={signingOut}
-              className="flex items-center bg-red-50 text-red-700 hover:bg-red-100 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 border border-red-200 hover:border-red-300 disabled:opacity-50"
-            >
-              {signingOut ? (
-                <>
-                  <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-red-600 mr-2" />
-                  Signing out...
-                </>
-              ) : (
-                <>
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Sign Out
-                </>
-              )}
+              <ChevronDown className="h-3 w-3 ml-1" />
             </button>
+            {userMenuOpen && (
+              <div className="absolute right-0 top-full -mt-2 w-52 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 overflow-hidden py-1">
+                <Link 
+                  href={profile?.user_type === 'organization' ? '/dashboard/organization' : '/dashboard'} 
+                  className="block px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium border-b border-gray-50"
+                  onClick={() => setUserMenuOpen(false)}
+                >
+                  Dashboard
+                </Link>
+                <Link 
+                  href="/profile" 
+                  className="block px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium border-b border-gray-50"
+                  onClick={() => setUserMenuOpen(false)}
+                >
+                  Edit Profile
+                </Link>
+                {profile?.user_type === 'participant' && (
+                  <Link 
+                    href="/my-applications" 
+                    className="block px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium border-b border-gray-50"
+                    onClick={() => setUserMenuOpen(false)}
+                  >
+                    My Applications
+                  </Link>
+                )}
+                <button 
+                  onClick={() => {
+                    handleSignOut();
+                    setUserMenuOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors font-semibold"
+                >
+                  Sign Out
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex items-center space-x-4">
@@ -364,7 +396,7 @@ export default function Navbar() {
       <div className="md:hidden flex items-center">
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className={`p-2 rounded-md transition-colors ${isEventsPage ? 'text-white hover:text-blue-200' : 'text-gray-700 hover:text-blue-600'}`}
+          className={`p-2 rounded-md transition-colors ${isEventsPage ? 'text-[#003399] hover:text-blue-600' : 'text-gray-700 hover:text-blue-600'}`}
         >
           {mobileMenuOpen ? (
             <X className="h-6 w-6" />
@@ -400,7 +432,7 @@ export default function Navbar() {
   }
 
   return (
-    <nav className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-5xl backdrop-blur-md shadow-2xl rounded-full border transition-colors duration-300 ${isEventsPage ? 'bg-blue-900/95 border-blue-700/50' : 'bg-white/90 border-gray-200/50'}`}>
+    <nav className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-5xl backdrop-blur-md shadow-2xl rounded-full border transition-all duration-500 ${isEventsPage ? 'bg-white/95 border-[#003399]/10' : 'bg-white/90 border-gray-200/50'} ${isSidebarOpen && isEventsPage ? 'md:left-[calc(50%+175px)] md:-translate-x-1/2' : ''}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {navContent}

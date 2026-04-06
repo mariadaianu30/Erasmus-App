@@ -4,7 +4,12 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { Calendar, MapPin, Users, Clock, CheckCircle, XCircle, AlertCircle, Eye, FileText } from 'lucide-react'
+import { 
+  Calendar, MapPin, Users, Clock, CheckCircle, 
+  XCircle, AlertCircle, Eye, FileText, ChevronDown, 
+  ChevronUp, ArrowLeft 
+} from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 interface User {
   id: string
@@ -28,6 +33,138 @@ interface Application {
   }
 }
 
+// Sub-component for Status Badge
+const StatusBadge = ({ status }: { status: string }) => {
+  const styles = {
+    pending: 'bg-[#FFF9E5] text-[#D97706]', // Amber
+    accepted: 'bg-[#E6FFFA] text-[#047857]', // Green
+    rejected: 'bg-[#FFF5F5] text-[#C53030]', // Red
+  }
+  const labels = {
+    pending: 'Under Review',
+    accepted: 'Accepted',
+    rejected: 'Not Selected',
+  }
+  const currentStyle = styles[status as keyof typeof styles] || 'bg-gray-100 text-gray-600'
+  const currentLabel = labels[status as keyof typeof labels] || status
+
+  return (
+    <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider ${currentStyle}`}>
+      {currentLabel}
+    </span>
+  )
+}
+
+// Sub-component for Application Card
+const ApplicationCard = ({ app }: { app: Application }) => {
+  const [isExpanded, setIsExpanded] = useState(false)
+
+  return (
+    <motion.div 
+      layout
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white rounded-[24px] border border-[#E2ECFB] p-8 shadow-sm hover:shadow-[0_8px_30px_rgba(26,111,232,0.06)] transition-all group"
+    >
+      <div className="flex flex-col space-y-6">
+        {/* Top Header Labeling */}
+        <div className="flex items-center justify-between">
+          <StatusBadge status={app.status} />
+          <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+            <Calendar size={12} className="text-[#1A6FE8]" />
+            {new Date(app.events.start_date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })} — 
+            {new Date(app.events.end_date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+          </div>
+        </div>
+
+        {/* Content Section */}
+        <div className="space-y-4">
+          <h3 className="text-xl font-bold text-[#0D1B3E] group-hover:text-[#1A6FE8] transition-colors">
+            {app.events.title}
+          </h3>
+          
+          <div className="relative">
+             <p className={`text-sm text-gray-500 leading-relaxed transition-all duration-300 ${!isExpanded ? 'line-clamp-3' : ''}`}>
+              {app.events.description}
+            </p>
+            {app.events.description.length > 200 && (
+              <button 
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="mt-2 text-[10px] font-black text-[#1A6FE8] uppercase tracking-widest hover:underline flex items-center gap-1"
+              >
+                {isExpanded ? <>Show Less <ChevronUp size={12} /></> : <>Read More <ChevronDown size={12} /></>}
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap gap-6 items-center pt-2">
+            <div className="flex items-center text-xs font-bold text-gray-400 gap-2">
+              <MapPin size={14} className="text-[#1A6FE8]" />
+              {app.events.location}
+            </div>
+            <div className="flex items-center text-xs font-bold text-gray-400 gap-2">
+              <Users size={14} className="text-[#1A6FE8]" />
+              Max {app.events.max_participants} Participants
+            </div>
+          </div>
+        </div>
+
+        <div className="h-px bg-[#F0F4FA]" />
+
+        {/* Status Message Block */}
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+              Applied on {new Date(app.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+            </span>
+          </div>
+
+          {app.status === 'pending' && (
+            <div className="bg-[#E8F1FD] border-l-4 border-[#1A6FE8] p-5 rounded-r-2xl">
+              <p className="text-sm font-bold text-[#0D1B3E]">Your application is being reviewed...</p>
+              <p className="text-xs text-gray-500 mt-1">The organization will notify you as soon as a decision is reached.</p>
+            </div>
+          )}
+
+          {app.status === 'accepted' && (
+            <div className="bg-[#E6FFFA] border-l-4 border-[#047857] p-5 rounded-r-2xl">
+              <p className="text-sm font-bold text-[#047857]">Congratulations! You&apos;ve been accepted.</p>
+              <p className="text-xs text-[#047857]/70 mt-1">Check your email for boarding passes and instructions.</p>
+            </div>
+          )}
+
+          {app.status === 'rejected' && (
+            <div className="bg-[#FFF5F5] border-l-4 border-[#C53030] p-5 rounded-r-2xl">
+              <p className="text-sm font-bold text-[#C53030]">Thank you for applying.</p>
+              <p className="text-xs text-[#C53030]/70 mt-1">While you weren&apos;t selected this time, there are many more opportunities!</p>
+            </div>
+          )}
+
+          {/* Motivation Preview */}
+          {app.motivation_letter && (
+            <div className="space-y-2 mt-2">
+              <label className="text-[10px] font-black text-[#1A6FE8] uppercase tracking-widest ml-1">Motivation Letter Preview</label>
+              <div className="bg-[#F8FAFF] rounded-2xl p-6 border border-[#E2ECFB] font-mono text-[11px] text-gray-500 leading-relaxed italic">
+                &quot;{app.motivation_letter.slice(0, 150)}...&quot;
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-4 pt-2">
+          <Link
+            href={`/events/${app.events.id}`}
+            className="px-6 py-3 border-2 border-[#1A6FE8] text-[#1A6FE8] text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-[#1A6FE8] hover:text-white transition-all flex items-center gap-2"
+          >
+            <Eye size={14} /> View Event
+          </Link>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
 export default function MyApplicationsPage() {
   const [user, setUser] = useState<User | null>(null)
   const [applications, setApplications] = useState<Application[]>([])
@@ -45,42 +182,6 @@ export default function MyApplicationsPage() {
       }
 
       setUser(session.user)
-      
-      // Check if profile exists first
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .select('user_type')
-        .eq('id', session.user.id)
-        .single()
-
-      if (profileError && (profileError.code === 'PGRST116' || profileError.message?.includes('No rows found'))) {
-        try {
-          // Get user metadata to extract names - use getSession() to avoid AuthSessionMissingError
-          const { data: { session } } = await supabase.auth.getSession()
-          if (!session?.user) {
-            return
-          }
-          const userMeta = session.user.user_metadata || {}
-          
-          const { error: insertError } = await supabase
-            .from('profiles')
-            .upsert({
-              id: session.user.id,
-              user_type: (userMeta.user_type || 'participant') as any,
-              first_name: userMeta.first_name || '',
-              last_name: userMeta.last_name || '',
-              age: userMeta.age || 18,
-              organization_name: userMeta.organization_name || null
-            })
-          
-          if (insertError) {
-            console.error('Failed to create profile:', insertError)
-          }
-        } catch (createError) {
-          console.error('Exception creating profile:', createError)
-        }
-      }
-      
       await fetchApplications(session.user.id)
       setLoading(false)
     }
@@ -98,50 +199,16 @@ export default function MyApplicationsPage() {
           created_at,
           motivation_letter,
           events!applications_event_id_fkey (
-            id,
-            title,
-            description,
-            start_date,
-            end_date,
-            location,
-            category,
-            max_participants
+            id, title, description, start_date, end_date, location, category, max_participants
           )
         `)
         .eq('participant_id', userId)
         .order('created_at', { ascending: false })
 
       if (error) throw error
-
       setApplications(data as any || [])
     } catch (error) {
       console.error('Error fetching applications:', error)
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'accepted':
-        return <CheckCircle className="h-5 w-5 text-green-600" />
-      case 'rejected':
-        return <XCircle className="h-5 w-5 text-red-600" />
-      case 'pending':
-        return <Clock className="h-5 w-5 text-yellow-600" />
-      default:
-        return <AlertCircle className="h-5 w-5 text-gray-600" />
-    }
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'accepted':
-        return 'bg-green-100 text-green-800 border-green-200'
-      case 'rejected':
-        return 'bg-red-100 text-red-800 border-red-200'
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200'
     }
   }
 
@@ -152,250 +219,105 @@ export default function MyApplicationsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFF]">
+        <div className="relative">
+          <div className="w-16 h-16 border-4 border-blue-100 border-t-[#1A6FE8] rounded-full animate-spin"></div>
+        </div>
+        <p className="mt-6 text-sm font-black text-[#0D1B3E] uppercase tracking-[0.2em]">Syncing Applications...</p>
       </div>
     )
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h2>
-          <p className="text-gray-600 mb-4">You need to be logged in to view your applications.</p>
-          <button
-            onClick={() => router.push('/auth')}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-          >
-            Go to Login
-          </button>
-        </div>
-      </div>
-    )
-  }
+  const stats = [
+    { label: 'Total', count: applications.length, color: 'text-blue-600' },
+    { label: 'Pending', count: applications.filter(a => a.status === 'pending').length, color: 'text-[#D97706]' },
+    { label: 'Accepted', count: applications.filter(a => a.status === 'accepted').length, color: 'text-[#047857]' },
+    { label: 'Rejected', count: applications.filter(a => a.status === 'rejected').length, color: 'text-[#C53030]' }
+  ]
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">My Applications</h1>
-          <p className="text-gray-600">Track and manage your opportunity applications.</p>
-        </div>
-
-        {/* Filter Tabs */}
-        <div className="bg-white rounded-lg shadow-sm border mb-6">
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex flex-wrap sm:flex-nowrap overflow-x-auto px-4 sm:px-6 scrollbar-hide">
-              {[
-                { key: 'all', label: 'All', count: applications.length },
-                { key: 'pending', label: 'Pending', count: applications.filter(app => app.status === 'pending').length },
-                { key: 'accepted', label: 'Accepted', count: applications.filter(app => app.status === 'accepted').length },
-                { key: 'rejected', label: 'Rejected', count: applications.filter(app => app.status === 'rejected').length },
-              ].map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setFilter(tab.key as any)}
-                  className={`py-4 px-3 sm:px-1 border-b-2 font-medium text-sm whitespace-nowrap transition-colors ${
-                    filter === tab.key
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  <span className="hidden sm:inline">{tab.label}</span>
-                  <span className="sm:hidden">{tab.label}</span>
-                  {tab.count > 0 && (
-                    <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${ 
-                      filter === tab.key ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
-                    }`}>
-                      {tab.count}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </nav>
+    <div className="min-h-screen bg-[#F8FAFF] font-dm-sans pb-20 selection:bg-[#1A6FE8] selection:text-white pt-[116px]">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-16">
+          <div className="space-y-2">
+            <Link href="/dashboard" className="inline-flex items-center text-[10px] font-black text-[#1A6FE8] uppercase tracking-widest hover:gap-2 transition-all mb-4">
+              <ArrowLeft size={14} className="mr-2" /> Back to Dashboard
+            </Link>
+            <h1 className="text-4xl font-black text-[#0D1B3E] tracking-tight">My Applications</h1>
+            <p className="text-sm font-medium text-gray-400">Track and manage your opportunity applications across the map.</p>
           </div>
         </div>
 
-        {/* Applications List */}
-        <div className="space-y-6">
-          {filteredApplications.length === 0 ? (
-            <div className="bg-white rounded-lg shadow-sm border p-12 text-center">
-              <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {filter === 'all' ? 'No applications yet' : `No ${filter} applications`}
-              </h3>
-              <p className="text-gray-500 mb-6">
-                {filter === 'all' 
-                  ? "You haven&apos;t applied to any events yet. Start exploring!"
-                  : `You don&apos;t have any ${filter} applications at the moment.`
-                }
-              </p>
-              {filter === 'all' && (
-                <Link
-                  href="/events"
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                >
-                  Browse Events
-                </Link>
-              )}
-            </div>
-          ) : (
-            filteredApplications.map((application) => (
-              <div key={application.id} className="bg-white rounded-lg shadow-sm border">
-                <div className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center mb-2">
-                        {getStatusIcon(application.status)}
-                        <span className={`ml-2 px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(application.status)}`}>
-                          {application.status === 'pending' ? 'Under Review' : 
-                           application.status === 'accepted' ? 'Accepted!' : 
-                           'Not Selected'}
-                        </span>
-                      </div>
-                      
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                        {application.events.title}
-                      </h3>
-                      
-                      <p className="text-gray-600 mb-4 line-clamp-2">
-                        {application.events.description}
-                      </p>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                        <div className="flex items-center text-sm text-gray-600">
-                          <Calendar className="h-4 w-4 mr-2 text-gray-400" />
-                          <span>
-                            {new Date(application.events.start_date).toLocaleDateString()} - {new Date(application.events.end_date).toLocaleDateString()}
-                          </span>
-                        </div>
-                        
-                        <div className="flex items-center text-sm text-gray-600">
-                          <MapPin className="h-4 w-4 mr-2 text-gray-400" />
-                          <span>{application.events.location}</span>
-                        </div>
-                        
-                        <div className="flex items-center text-sm text-gray-600">
-                          <Users className="h-4 w-4 mr-2 text-gray-400" />
-                          <span>Max {application.events.max_participants} participants</span>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center text-sm text-gray-500 mb-4">
-                        <Clock className="h-4 w-4 mr-2" />
-                        <span>Applied on {new Date(application.created_at).toLocaleDateString()}</span>
-                      </div>
+        {/* Filter Pills */}
+        <div className="flex flex-wrap gap-3 mb-12">
+          {['all', 'pending', 'accepted', 'rejected'].map((f) => {
+            const count = f === 'all' ? applications.length : applications.filter(a => a.status === f).length
+            const isActive = filter === f
+            return (
+              <button
+                key={f}
+                onClick={() => setFilter(f as any)}
+                className={`group flex items-center gap-3 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                  isActive 
+                  ? 'bg-[#1A6FE8] text-white shadow-xl shadow-blue-100' 
+                  : 'bg-white text-gray-400 border border-[#E2ECFB] hover:border-[#1A6FE8]/30'
+                }`}
+              >
+                {f}
+                <span className={`px-2 py-0.5 rounded-lg text-[9px] ${
+                  isActive ? 'bg-white/20 text-white' : 'bg-[#F0F4FA] text-gray-400'
+                }`}>
+                  {count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
 
-                      {/* Status-specific messages */}
-                      {application.status === 'accepted' && (
-                        <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
-                          <div className="flex items-center">
-                            <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
-                            <div>
-                              <p className="text-sm font-medium text-green-800">
-                                🎉 Congratulations! You&apos;ve been accepted to this event.
-                              </p>
-                              <p className="text-xs text-green-700 mt-1">
-                                The organization will contact you with further details.
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {application.status === 'rejected' && (
-                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
-                          <div className="flex items-center">
-                            <XCircle className="h-5 w-5 text-gray-600 mr-2" />
-                            <div>
-                              <p className="text-sm font-medium text-gray-800">
-                                Thank you for your interest in this opportunity.
-                              </p>
-                              <p className="text-xs text-gray-700 mt-1">
-                                Keep applying to other events that match your interests!
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {application.status === 'pending' && (
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                          <div className="flex items-center">
-                            <Clock className="h-5 w-5 text-blue-600 mr-2" />
-                            <div>
-                              <p className="text-sm font-medium text-blue-800">
-                                Your application is being reviewed by the organization.
-                              </p>
-                              <p className="text-xs text-blue-700 mt-1">
-                                You&apos;ll be notified once a decision is made.
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {application.motivation_letter && (
-                        <div className="bg-gray-50 rounded-lg p-4">
-                          <div className="flex items-center mb-2">
-                            <FileText className="h-4 w-4 mr-2 text-gray-500" />
-                            <span className="text-sm font-medium text-gray-700">Motivation Letter</span>
-                          </div>
-                          <p className="text-sm text-gray-600 line-clamp-3">
-                            {application.motivation_letter}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="ml-6 flex flex-col space-y-2">
-                      <Link
-                        href={`/events/${application.events.id}`}
-                        className="flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                      >
-                        <Eye className="h-4 w-4 mr-2" />
-                        View Event
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))
+        {/* Applications Feed */}
+        <div className="space-y-8 min-h-[400px]">
+          {filteredApplications.length === 0 ? (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white rounded-[32px] border border-[#E2ECFB] p-20 text-center shadow-sm">
+              <FileText className="h-16 w-16 text-[#1A6FE8]/20 mx-auto mb-6" />
+              <h3 className="text-xl font-bold text-[#0D1B3E] mb-2">No applications found</h3>
+              <p className="text-gray-400 mb-8 max-w-sm mx-auto">It looks like you haven&apos;t applied to any programs matching this filter yet.</p>
+              <Link
+                href="/events"
+                className="inline-block px-10 py-5 bg-[#1A6FE8] text-white font-black text-xs uppercase tracking-widest rounded-full shadow-lg hover:scale-105 transition-all"
+              >
+                Browse New Events
+              </Link>
+            </motion.div>
+          ) : (
+            <div className="grid grid-cols-1 gap-8">
+              {filteredApplications.map((app) => (
+                <ApplicationCard key={app.id} app={app} />
+              ))}
+            </div>
           )}
         </div>
 
-        {/* Stats Summary */}
-        {applications.length > 0 && (
-          <div className="mt-8 bg-white rounded-lg shadow-sm border p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Application Summary</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-gray-900">{applications.length}</div>
-                <div className="text-sm text-gray-600">Total Applications</div>
+        {/* Bottom Metrics Summary */}
+        <div className="mt-20">
+          <div className="h-px bg-[#E2ECFB] mb-12" />
+          <h2 className="text-[10px] font-black text-[#1A6FE8] uppercase tracking-[0.3em] mb-8 text-center">Global Application Summary</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {stats.map((s, i) => (
+              <div key={i} className="bg-[#F8FAFF] rounded-3xl p-8 text-center flex flex-col justify-center gap-2">
+                <span className={`text-4xl font-black ${s.label === 'Total' ? 'text-[#0D1B3E]' : s.color}`}>{s.count}</span>
+                <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">{s.label}</span>
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-yellow-600">
-                  {applications.filter(app => app.status === 'pending').length}
-                </div>
-                <div className="text-sm text-gray-600">Pending</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">
-                  {applications.filter(app => app.status === 'accepted').length}
-                </div>
-                <div className="text-sm text-gray-600">Accepted</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-red-600">
-                  {applications.filter(app => app.status === 'rejected').length}
-                </div>
-                <div className="text-sm text-gray-600">Rejected</div>
-              </div>
-            </div>
+            ))}
           </div>
-        )}
+        </div>
+
+        <div className="mt-20 text-center pb-10">
+           <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest flex items-center justify-center gap-2">
+             <CheckCircle size={14} className="text-blue-200" /> All data is encrypted and managed by Antigravity EU
+           </p>
+        </div>
       </div>
     </div>
   )

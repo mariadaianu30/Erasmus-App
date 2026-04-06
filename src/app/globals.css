@@ -51,6 +51,7 @@ body {
 /* Smooth page transitions */
 html {
   scroll-behavior: smooth;
+  font-size: 90%;
 }
 
 /* Page fade-in animation */

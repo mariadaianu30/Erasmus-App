@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Calendar, ArrowLeft, Award, MapPin, Globe, Users } from 'lucide-react'
+import { Calendar, ArrowLeft, Award, MapPin, Globe, Users, ArrowUpRight } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/lib/utils'
 
@@ -143,115 +144,200 @@ export default function OrganizationDetailsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <Link href="/organizations" className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 mb-6">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to organizations
+    <div className="min-h-screen bg-[#fdfbf6] flex flex-col md:flex-row relative font-sans selection:bg-blue-100 selection:text-blue-900">
+      {/* Hiding global navbar for this specific specialized view */}
+      <style dangerouslySetInnerHTML={{ __html: `nav { display: none !important; }` }} />
+
+      {/* Left Sidebar: NGO Profile (Fixed, White, Clean) */}
+      <motion.aside
+        initial={{ x: -50, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+        className="w-full md:w-[30%] bg-white text-[#003399] p-8 md:p-12 md:fixed md:left-0 md:top-0 md:h-screen overflow-y-auto shadow-[20px_0_60px_rgba(0,51,153,0.05)] z-50 flex flex-col border-r border-blue-50/50"
+      >
+        <Link 
+          href="/organizations" 
+          className="inline-flex items-center text-[10px] font-black uppercase tracking-[0.3em] text-blue-900/30 hover:text-blue-600 mb-12 transition-all group"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2 group-hover:-translate-x-1 transition-transform" />
+          BACK TO ORGANIZATIONS
         </Link>
 
-        <div className="bg-white border rounded-lg shadow-sm p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">{organization.organization_name}</h1>
-              {(organization.first_name || organization.last_name) && (
-                <p className="text-sm text-gray-600 mt-1">
-                  Contact: {[organization.first_name, organization.last_name].filter(Boolean).join(' ')}
-                </p>
+        <div className="flex-1">
+          <div className="flex flex-col gap-6 mb-10">
+            <div className="space-y-1">
+              <p className="text-[9px] font-black uppercase tracking-[0.4em] text-amber-500 mb-2">Verified Partner</p>
+              <h1 className="text-3xl md:text-4xl font-black tracking-tighter leading-[0.95] mb-4 text-[#003399]">
+                {organization.organization_name}
+              </h1>
+            </div>
+            
+            <div className="flex flex-wrap gap-2">
+              {organization.is_verified ? (
+                <span className="inline-flex items-center px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-blue-50 text-[#003399] border border-blue-100/50 shadow-sm">
+                  <Award className="h-3.5 w-3.5 mr-2 text-amber-500" />
+                  Official Agency
+                </span>
+              ) : (
+                <span className="inline-flex items-center px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-gray-50 text-gray-400 border border-gray-100 uppercase italic">
+                  Pending Verification
+                </span>
               )}
             </div>
-            {organization.is_verified ? (
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                <Award className="h-3 w-3 mr-1" />
-                Verified
-              </span>
-            ) : (
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                Unverified
-              </span>
-            )}
           </div>
 
-          <div className="mt-6 space-y-3 text-sm text-gray-700">
+          <div className="space-y-6 text-sm text-[#003399]/70 font-medium">
             {organization.location && (
-              <div className="flex items-center">
-                <MapPin className="h-4 w-4 mr-2 text-gray-500" />
-                {organization.location}
+              <div className="flex items-start gap-4 p-4 rounded-2xl bg-blue-50/30 border border-blue-100/20">
+                <div className="p-2 bg-white rounded-lg shadow-sm border border-blue-50">
+                  <MapPin className="h-4 w-4 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-[8px] uppercase tracking-widest text-[#003399]/30 mb-1">Headquarters</p>
+                  <span className="leading-relaxed text-[#003399] text-xs font-bold">{organization.location}</span>
+                </div>
               </div>
             )}
 
             {organization.organization_website && (
-              <div className="flex items-center">
-                <Globe className="h-4 w-4 mr-2 text-gray-500" />
-                <a
-                  href={organization.organization_website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:text-blue-800 break-all"
-                >
-                  {organization.organization_website}
-                </a>
+              <div className="flex items-start gap-4 p-4 rounded-2xl bg-blue-50/30 border border-blue-100/20">
+                <div className="p-2 bg-white rounded-lg shadow-sm border border-blue-50">
+                  <Globe className="h-4 w-4 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-[8px] uppercase tracking-widest text-[#003399]/30 mb-1">Digital Presence</p>
+                  <a
+                    href={organization.organization_website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#003399] hover:text-blue-800 transition-colors break-all font-black uppercase text-[9px] tracking-widest flex items-center gap-2 group/link"
+                  >
+                    Visit Website
+                    <ArrowUpRight className="h-3 w-3 opacity-0 group-hover/link:opacity-100 transition-all -translate-y-1" />
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {(organization.first_name || organization.last_name) && (
+              <div className="flex items-start gap-4 p-4 rounded-2xl bg-blue-50/30 border border-blue-100/20">
+                <div className="p-2 bg-white rounded-lg shadow-sm border border-blue-50">
+                  <Users className="h-4 w-4 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-[8px] uppercase tracking-widest text-[#003399]/30 mb-1">Representative</p>
+                  <p className="text-[#003399] uppercase font-black tracking-tight text-xs">
+                    {[organization.first_name, organization.last_name].filter(Boolean).join(' ')}
+                  </p>
+                </div>
               </div>
             )}
           </div>
 
           {organization.bio && (
-            <div className="mt-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-2">About</h2>
-              <p className="text-gray-700 whitespace-pre-line">{organization.bio}</p>
+            <div className="mt-12 pt-8 border-t border-blue-50 relative">
+              <div className="absolute -top-3 left-0 px-4 bg-white text-[8px] font-black uppercase tracking-[0.5em] text-[#003399]/20">Mission</div>
+              <p className="text-[#003399]/70 text-base leading-relaxed font-serif italic tracking-wide">
+                "{organization.bio}"
+              </p>
             </div>
           )}
         </div>
 
-        <div className="mt-8 bg-white border rounded-lg shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">Upcoming events</h2>
-            <span className="text-sm text-gray-500">{events.length} {events.length === 1 ? 'event' : 'events'}</span>
+        <div className="mt-auto pt-8 border-t border-blue-50 flex flex-col gap-4">
+          <div className="flex justify-between items-center text-[8px] font-black text-[#003399]/20 uppercase tracking-[0.5em]">
+            <span>Est. 2024</span>
+            <span>Connect Program</span>
+          </div>
+        </div>
+      </motion.aside>
+
+      {/* Right Content: Hosted Events (Scrollable Area, Pushed by fixed Sidebar) */}
+      <motion.main
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.8 }}
+        className="flex-1 md:ml-[30%] p-8 md:p-16 flex flex-col relative z-10"
+      >
+        <div className="max-w-4xl w-full mx-auto">
+          <div className="flex flex-col md:flex-row items-baseline justify-between mb-16 gap-6">
+            <div className="space-y-3">
+              <div className="flex items-center gap-4">
+                <div className="h-8 w-1.5 bg-[#003399] rounded-full"></div>
+                <h2 className="text-3xl md:text-4xl font-black text-[#003399] uppercase tracking-tighter leading-none">Catalog</h2>
+              </div>
+              <p className="text-[9px] font-black text-[#003399]/20 uppercase tracking-[0.4em] ml-6">Available Opportunities</p>
+            </div>
+            <div className="bg-white px-6 py-3 rounded-2xl shadow-xl shadow-blue-900/[0.03] flex flex-col items-end border border-blue-50/50">
+              <span className="text-2xl font-black text-[#003399] tracking-tighter leading-none">{events.length}</span>
+              <span className="text-[7px] font-black text-[#003399]/30 uppercase tracking-[0.2em] mt-1">Active Events</span>
+            </div>
           </div>
 
           {events.length === 0 ? (
-            <p className="text-sm text-gray-600">This organization has no upcoming published events.</p>
+            <div className="text-center py-32 bg-white rounded-[3rem] border-2 border-dashed border-blue-100/30 flex flex-col items-center">
+              <Calendar className="h-16 w-16 text-blue-100 mb-6 opacity-20" />
+              <h3 className="text-lg font-black text-[#003399]/20 uppercase tracking-widest mb-2">No Active Programs</h3>
+              <p className="text-[8px] font-black text-[#003399]/10 uppercase tracking-[0.3em]">Check back later for new arrivals</p>
+            </div>
           ) : (
-            <div className="space-y-4">
-              {events.map((event) => (
-                <div key={event.id} className="border rounded-lg p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">{event.title}</h3>
-                      {event.category && <p className="text-sm text-gray-600">{event.category}</p>}
+            <div className="grid grid-cols-1 gap-8">
+              <AnimatePresence>
+                {events.map((event, index) => (
+                  <motion.div 
+                    key={event.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: "-50px" }}
+                    transition={{ delay: index * 0.05, duration: 0.5 }}
+                    className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-[0_15px_60px_rgba(0,51,153,0.03)] hover:shadow-[0_30px_90px_rgba(0,51,153,0.06)] transition-all duration-700 group relative overflow-hidden flex flex-col md:flex-row justify-between items-center gap-8 hover:-translate-y-2 border border-transparent hover:border-blue-50"
+                  >
+                    {/* Subtle numbering for boutique feel */}
+                    <div className="absolute top-6 right-10 text-[40px] font-black text-blue-50/50 leading-none select-none group-hover:text-amber-50/50 transition-colors">
+                      {(index + 1).toString().padStart(2, '0')}
                     </div>
-                    <Link
-                      href={`/events/${event.id}`}
-                      className="text-sm text-blue-600 font-medium hover:text-blue-800"
-                    >
-                      View details →
-                    </Link>
-                  </div>
 
-                  <div className="mt-3 space-y-2 text-sm text-gray-600">
-                    <div className="flex items-center">
-                      <Calendar className="h-4 w-4 mr-2 text-gray-500" />
-                      {formatDate(event.start_date)} – {formatDate(event.end_date)}
+                    <div className="flex-1 space-y-6 relative z-10 text-center md:text-left">
+                      <div className="flex items-center justify-center md:justify-start gap-3">
+                        <span className="bg-blue-50 text-[#003399] px-5 py-1.5 rounded-full text-[8.5px] font-black uppercase tracking-[0.2em] shadow-sm">
+                          {event.category || 'Erasmus+'}
+                        </span>
+                      </div>
+                      
+                      <h3 className="text-2xl md:text-3xl font-black text-[#003399] leading-tight tracking-tighter group-hover:text-blue-800 transition-colors max-w-sm">
+                        {event.title}
+                      </h3>
+
+                      <div className="flex flex-wrap justify-center md:justify-start gap-6 opacity-40">
+                        <div className="flex items-center text-[9px] font-black text-[#003399] uppercase tracking-widest">
+                          <Calendar className="h-3.5 w-3.5 mr-2 text-amber-500" />
+                          {formatDate(event.start_date)}
+                        </div>
+                        {event.location && (
+                          <div className="flex items-center text-[9px] font-black text-[#003399] uppercase tracking-widest">
+                            <MapPin className="h-3.5 w-3.5 mr-2 text-blue-400" />
+                            {event.location}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    {event.location && (
-                      <div className="flex items-center">
-                        <MapPin className="h-4 w-4 mr-2 text-gray-500" />
-                        {event.location}
-                      </div>
-                    )}
-                    {typeof event.max_participants === 'number' && (
-                      <div className="flex items-center">
-                        <Users className="h-4 w-4 mr-2 text-gray-500" />
-                        Up to {event.max_participants} participants
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+
+                    <div className="relative z-10 w-full md:w-auto">
+                      <Link
+                        href={`/events/${event.id}`}
+                        className="bg-[#003399] text-white px-10 py-5 rounded-2xl font-black uppercase text-[9px] tracking-[0.2em] hover:bg-amber-500 shadow-xl shadow-blue-900/10 hover:shadow-amber-200 transition-all flex items-center justify-center group/btn"
+                      >
+                        Details
+                        <ArrowUpRight className="h-4 w-4 ml-2 group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1 transition-transform" />
+                      </Link>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
           )}
         </div>
-      </div>
+      </motion.main>
     </div>
   )
 }

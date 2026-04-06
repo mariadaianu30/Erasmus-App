@@ -114,7 +114,7 @@ export default function ShareOpportunity({ title, url, type }: ShareOpportunityP
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={handleNativeShare}
-        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+        className="flex items-center gap-2 px-4 py-2 bg-[#003399] text-white rounded-lg hover:bg-blue-900 transition-colors font-medium"
         aria-label="Share opportunity"
       >
         <Share2 className="h-4 w-4" />

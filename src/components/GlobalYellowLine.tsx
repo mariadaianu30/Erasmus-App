@@ -3,7 +3,7 @@
 import { motion, useScroll, useSpring, useTransform } from "framer-motion";
 import { useRef } from "react";
 
-export default function GlobalYellowLine() {
+export default function GlobalYellowLine({ zIndex = 0 }: { zIndex?: number }) {
     const containerRef = useRef<HTMLDivElement>(null);
 
     const { scrollYProgress } = useScroll();
@@ -19,7 +19,7 @@ export default function GlobalYellowLine() {
     const pathLength = useTransform(smoothProgress, [0, 0.85], [0.30, 1]);
 
     return (
-        <div ref={containerRef} className="absolute inset-x-0 top-0 h-full w-full pointer-events-none overflow-hidden" style={{ zIndex: 0 }}>
+        <div ref={containerRef} className="absolute inset-x-0 top-0 h-full w-full pointer-events-none overflow-hidden" style={{ zIndex }}>
             <svg
                 className="w-full h-full"
                 preserveAspectRatio="none"
